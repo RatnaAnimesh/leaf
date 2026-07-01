@@ -5,6 +5,7 @@ mod ollama_client;
 mod state;
 pub mod graph;
 pub mod models;
+pub mod git;
 
 use state::AppState;
 use std::sync::{Arc, Mutex};
@@ -58,6 +59,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_pty::init())
         .manage(AppState {
             watcher: Mutex::new(None),
             graph_conn,
@@ -91,6 +93,19 @@ pub fn run() {
             commands::model_commands::preload_model,
             commands::graph_commands::rebuild_index,
             commands::graph_commands::get_index_stats,
+            commands::graph_commands::search_mentions,
+            commands::git_commands::get_repo_status,
+            commands::git_commands::has_uncommitted_changes,
+            commands::git_commands::get_file_diff,
+            commands::git_commands::get_file_head_content,
+            commands::git_commands::stage_file,
+            commands::git_commands::unstage_file,
+            commands::git_commands::commit,
+            commands::session_commands::list_sessions,
+            commands::session_commands::get_session_messages,
+            commands::session_commands::create_session,
+            commands::session_commands::add_message,
+            commands::session_commands::update_session_summary,
             start_watching_workspace,
         ])
         .run(tauri::generate_context!())

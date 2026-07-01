@@ -66,3 +66,46 @@ pub async fn get_index_stats(state: State<'_, AppState>) -> Result<IndexStats, S
         total_symbols,
     })
 }
+
+#[derive(serde::Serialize)]
+pub struct MentionResult {
+    pub label: String,
+    pub kind: String, // "file" or symbol kind
+    pub file_path: Option<String>,
+}
+
+#[tauri::command]
+pub async fn search_mentions(query: String, state: State<'_, AppState>) -> Result<Vec<MentionResult>, String> {
+    let conn = state.graph_conn.lock().await;
+    let mut results = Vec::new();
+    
+    let like_query = format!("%{}%", query);
+
+    // Search files
+    let mut stmt = conn.prepare("SELECT path FROM files WHERE path LIKE ?1 LIMIT 5").map_err(|e| e.to_string())?;
+    let mut file_rows = stmt.query([&like_query]).map_err(|e| e.to_string())?;
+    while let Ok(Some(row)) = file_rows.next() {
+        let path: String = row.get(0).unwrap_or_default();
+        results.push(MentionResult {
+            label: path.clone(),
+            kind: "file".to_string(),
+            file_path: Some(path),
+        });
+    }
+
+    // Search symbols
+    let mut stmt2 = conn.prepare("SELECT s.name, s.kind, f.path FROM symbols s JOIN files f ON s.file_id = f.id WHERE s.name LIKE ?1 LIMIT 10").map_err(|e| e.to_string())?;
+    let mut symbol_rows = stmt2.query([&like_query]).map_err(|e| e.to_string())?;
+    while let Ok(Some(row)) = symbol_rows.next() {
+        let name: String = row.get(0).unwrap_or_default();
+        let kind: String = row.get(1).unwrap_or_default();
+        let path: String = row.get(2).unwrap_or_default();
+        results.push(MentionResult {
+            label: name,
+            kind,
+            file_path: Some(path),
+        });
+    }
+
+    Ok(results)
+}

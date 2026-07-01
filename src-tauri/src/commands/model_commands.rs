@@ -25,6 +25,7 @@ pub async fn send_chat_message(
     anchor_line: Option<u32>,
     active_file_extension: Option<String>,
     use_reasoning: bool,
+    multi_file_intent: bool,
 ) -> Result<(), String> {
     let model_role = if use_reasoning {
         ModelRole::Reasoning
@@ -65,15 +66,46 @@ pub async fn send_chat_message(
         }).ok();
     } // release orchestrator lock before starting inference
 
-    // Step 2: fetch graph context for current cursor position.
+    // Step 2: fetch graph context for current cursor position and @mentions
     let context = {
         let conn = app_state.graph_conn.lock().await;
-        if let (Some(file), Some(line)) = (&anchor_file, anchor_line) {
+        let mut ctx = if let (Some(file), Some(line)) = (&anchor_file, anchor_line) {
             graph::context_select::select_context(&conn, file, line as usize)
                 .unwrap_or_else(|_| vec![])
         } else {
             vec![]
+        };
+
+        // Extract @mentions from user message
+        for word in user_message.split_whitespace() {
+            if word.starts_with('@') && word.len() > 1 {
+                let label = &word[1..];
+                use rusqlite::OptionalExtension;
+                
+                // Try file first
+                if let Ok(Some(path)) = conn.query_row(
+                    "SELECT path FROM files WHERE path = ?1 LIMIT 1",
+                    [label],
+                    |row| row.get::<_, String>(0)
+                ).optional() {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        ctx.push(format!("// File: {}\n{}", path, content));
+                        continue;
+                    }
+                }
+                
+                // Try symbol
+                if let Ok(Some((path, name, signature))) = conn.query_row(
+                    "SELECT f.path, s.name, s.signature FROM symbols s JOIN files f ON s.file_id = f.id WHERE s.name = ?1 LIMIT 1",
+                    [label],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+                ).optional() {
+                    ctx.push(format!("// Symbol: {} in {}\n{}", name, path, signature));
+                }
+            }
         }
+
+        ctx
     }; // release graph conn lock
 
     // Step 3: assemble full prompt.
@@ -91,6 +123,7 @@ pub async fn send_chat_message(
         &context,
         active_file_extension.as_deref(),
         model_role.clone(),
+        multi_file_intent,
     );
 
     // Step 4: stream to frontend.

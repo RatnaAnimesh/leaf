@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { FileExplorer } from './components/FileExplorer/FileExplorer';
+import { SourceControlPanel } from './components/FileExplorer/SourceControlPanel';
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
 import { CodeEditor } from './components/Editor/CodeEditor';
+import { TerminalDrawer } from './components/TerminalDrawer/TerminalDrawer';
 import { EditorProvider, useEditor } from './lib/EditorContext';
 import { loadWorkspaceConfig, saveWorkspaceConfig, readFile, writeFile, startWatchingWorkspace } from './lib/tauri-commands';
 import { WorkspaceConfig } from './lib/types';
@@ -10,6 +12,8 @@ import { WorkspaceConfig } from './lib/types';
 function LeafIDE() {
   const [config, setConfig] = useState<WorkspaceConfig | null>(null);
   const [chatCollapsed, setChatCollapsed] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [leftTab, setLeftTab] = useState<'explorer' | 'git'>('explorer');
   const workspaceRoot = '.'; // Default for Phase 1
   const { state, openFile, closeFile, updateTabContent, updateTabSavedContent, updateTabViewState, setActiveTab } = useEditor();
 
@@ -24,6 +28,12 @@ function LeafIDE() {
       if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         setChatCollapsed(prev => !prev);
+      }
+      
+      // Cmd+` for terminal toggle
+      if (e.metaKey && e.key === '`') {
+        e.preventDefault();
+        setTerminalOpen(prev => !prev);
       }
       
       // Cmd+S for save
@@ -93,18 +103,39 @@ function LeafIDE() {
         <Panel defaultSize={config.mainSplit[0]} minSize={20} maxSize={50}>
           <PanelGroup direction="vertical" onLayout={(sizes) => handleLayoutChange(sizes, 'left')}>
             <Panel defaultSize={config.leftSplit[0]} minSize={20}>
-              <FileExplorer workspaceRoot={workspaceRoot} onFileSelect={async (p) => {
-                if (!state.openTabs.find(t => t.path === p)) {
-                  try {
-                    const content = await readFile(p);
-                    openFile(p, content);
-                  } catch (e) {
-                    console.error("Read err", e);
-                  }
-                } else {
-                  setActiveTab(p);
-                }
-              }} />
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid #ccc', background: '#f5f5f5' }}>
+                  <button 
+                    style={{ flex: 1, padding: '4px', background: leftTab === 'explorer' ? '#fff' : 'transparent', border: 'none', borderRight: '1px solid #ccc', cursor: 'pointer' }}
+                    onClick={() => setLeftTab('explorer')}
+                  >Explorer</button>
+                  <button 
+                    style={{ flex: 1, padding: '4px', background: leftTab === 'git' ? '#fff' : 'transparent', border: 'none', cursor: 'pointer' }}
+                    onClick={() => setLeftTab('git')}
+                  >Source Control</button>
+                </div>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  {leftTab === 'explorer' && (
+                    <FileExplorer workspaceRoot={workspaceRoot} onFileSelect={async (p) => {
+                      if (!state.openTabs.find(t => t.path === p && !t.isDiff)) {
+                        try {
+                          const content = await readFile(p);
+                          openFile(p, content);
+                        } catch (e) {
+                          console.error("Read err", e);
+                        }
+                      } else {
+                        setActiveTab(p);
+                      }
+                    }} />
+                  )}
+                  {leftTab === 'git' && (
+                    <SourceControlPanel workspaceRoot={workspaceRoot} onFileSelect={(p, content, isDiff, originalContent) => {
+                      openFile(p, content, isDiff, originalContent);
+                    }} />
+                  )}
+                </div>
+              </div>
             </Panel>
             <PanelResizeHandle style={{ height: '4px', background: '#ccc', cursor: 'row-resize' }} />
             <Panel 
@@ -120,44 +151,66 @@ function LeafIDE() {
         <PanelResizeHandle style={{ width: '4px', background: '#ccc', cursor: 'col-resize' }} />
         
         <Panel defaultSize={config.mainSplit[1]} minSize={40}>
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', borderBottom: '1px solid #ccc', background: '#f5f5f5' }}>
-              {state.openTabs.map(tab => (
-                <div 
-                  key={tab.path} 
-                  style={{ 
-                    padding: '8px 16px', 
-                    cursor: 'pointer', 
-                    background: tab.path === state.activeTabPath ? '#fff' : 'transparent',
-                    borderRight: '1px solid #ccc',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                  onClick={() => setActiveTab(tab.path)}
-                >
-                  {tab.path.split('/').pop()}
-                  {tab.content !== tab.savedContent && <span style={{ marginLeft: 4, width: 8, height: 8, borderRadius: '50%', background: 'black' }} />}
-                  <button onClick={(e) => { e.stopPropagation(); closeFile(tab.path); }} style={{ marginLeft: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>x</button>
+          <PanelGroup direction="vertical">
+            <Panel defaultSize={terminalOpen ? 70 : 100}>
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid #ccc', background: '#f5f5f5' }}>
+                  {state.openTabs.map(tab => (
+                    <div 
+                      key={tab.path} 
+                      style={{ 
+                        padding: '8px 16px', 
+                        cursor: 'pointer', 
+                        background: tab.path === state.activeTabPath ? '#fff' : 'transparent',
+                        borderRight: '1px solid #ccc',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      onClick={() => setActiveTab(tab.path)}
+                    >
+                      {tab.path.split('/').pop()}
+                      {tab.content !== tab.savedContent && <span style={{ marginLeft: 4, width: 8, height: 8, borderRadius: '50%', background: 'black' }} />}
+                      <button onClick={(e) => { e.stopPropagation(); closeFile(tab.path); }} style={{ marginLeft: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>x</button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              {activeTab ? (
-                <CodeEditor
-                  filePath={activeTab.path}
-                  content={activeTab.content}
-                  language={getLanguage(activeTab.path)}
-                  onChange={(newContent) => updateTabContent(activeTab.path, newContent)}
-                  onViewStateChange={(pos, scroll) => updateTabViewState(activeTab.path, pos, scroll)}
-                  initialViewState={{ cursorPosition: activeTab.cursorPosition, scrollTop: activeTab.scrollTop }}
-                />
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                  No file open
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  {activeTab ? (
+                    <CodeEditor
+                      filePath={activeTab.path}
+                      content={activeTab.content}
+                      language={activeTab.isDiff ? 'diff' : getLanguage(activeTab.path)}
+                      onChange={(newContent) => updateTabContent(activeTab.path, newContent)}
+                      onViewStateChange={(pos, scroll) => updateTabViewState(activeTab.path, pos, scroll)}
+                      initialViewState={{ cursorPosition: activeTab.cursorPosition, scrollTop: activeTab.scrollTop }}
+                      isDiff={activeTab.isDiff}
+                      originalContent={activeTab.originalContent}
+                    />
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      No file open
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            </Panel>
+            
+            {terminalOpen && (
+              <>
+                <PanelResizeHandle style={{ height: '4px', background: '#ccc', cursor: 'row-resize' }} />
+                <Panel defaultSize={30} minSize={10}>
+                  <TerminalDrawer 
+                    onClose={() => setTerminalOpen(false)}
+                    onSendToChat={(text) => {
+                      // Note: We need a way to send this text to the chat panel.
+                      // For now, we will dispatch a custom event that ChatPanel can listen to.
+                      window.dispatchEvent(new CustomEvent('send-to-chat', { detail: text }));
+                    }}
+                  />
+                </Panel>
+              </>
+            )}
+          </PanelGroup>
         </Panel>
       </PanelGroup>
     </div>

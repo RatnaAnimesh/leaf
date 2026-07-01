@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { FileNode, WorkspaceConfig, ChatMessage } from './types';
+import { FileNode, WorkspaceConfig, ChatMessage, RepoStatus, ChatSession, MentionResult } from './types';
 
 export interface ReadDirectoryResult {
   nodes: FileNode[];
@@ -33,7 +33,8 @@ export async function sendChatMessage(
   anchorFile: string | null,
   anchorLine: number | null,
   activeFileExtension: string | null,
-  useReasoning: boolean
+  useReasoning: boolean,
+  multiFileIntent: boolean
 ): Promise<void> {
   return invoke('send_chat_message', { 
     userMessage, 
@@ -42,7 +43,8 @@ export async function sendChatMessage(
     anchorFile,
     anchorLine,
     activeFileExtension,
-    useReasoning
+    useReasoning,
+    multiFileIntent
   });
 }
 
@@ -52,4 +54,56 @@ export async function preloadModel(role: 'coder' | 'reasoning'): Promise<void> {
 
 export async function startWatchingWorkspace(path: string): Promise<void> {
   return invoke('start_watching_workspace', { path });
+}
+
+export async function getRepoStatus(workspaceRoot: string): Promise<RepoStatus> {
+  return invoke('get_repo_status', { workspaceRoot });
+}
+
+export async function hasUncommittedChanges(workspaceRoot: string): Promise<boolean> {
+  return invoke('has_uncommitted_changes', { workspaceRoot });
+}
+
+export async function getFileDiff(workspaceRoot: string, path: string): Promise<string> {
+  return invoke('get_file_diff', { workspaceRoot, path });
+}
+
+export async function getFileHeadContent(workspaceRoot: string, path: string): Promise<string> {
+  return invoke('get_file_head_content', { workspaceRoot, path });
+}
+
+export async function stageFile(workspaceRoot: string, path: string): Promise<void> {
+  return invoke('stage_file', { workspaceRoot, path });
+}
+
+export async function unstageFile(workspaceRoot: string, path: string): Promise<void> {
+  return invoke('unstage_file', { workspaceRoot, path });
+}
+
+export async function commit(workspaceRoot: string, message: string): Promise<void> {
+  return invoke('commit', { workspaceRoot, message });
+}
+
+export async function listSessions(): Promise<ChatSession[]> {
+  return invoke('list_sessions');
+}
+
+export async function getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
+  return invoke('get_session_messages', { sessionId });
+}
+
+export async function createSession(id: string, title: string): Promise<ChatSession> {
+  return invoke('create_session', { id, title });
+}
+
+export async function addMessage(sessionId: string, role: string, content: string): Promise<number> {
+  return invoke('add_message', { sessionId, role, content });
+}
+
+export async function updateSessionSummary(sessionId: string, summary: string): Promise<void> {
+  return invoke('update_session_summary', { sessionId, summary });
+}
+
+export async function searchMentions(query: string): Promise<MentionResult[]> {
+  return invoke('search_mentions', { query });
 }

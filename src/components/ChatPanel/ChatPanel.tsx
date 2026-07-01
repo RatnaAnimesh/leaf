@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { ChatMessage, ChatStreamChunk, ModelStatus } from '../../lib/types';
-import { sendChatMessage, preloadModel } from '../../lib/tauri-commands';
+import { useState, useEffect } from 'react';
+import { ChatMessage, ChatStreamChunk, ModelStatus, MentionResult } from '../../lib/types';
+import { sendChatMessage, preloadModel, listSessions, getSessionMessages, createSession, addMessage, updateSessionSummary, searchMentions } from '../../lib/tauri-commands';
 import { listen } from '@tauri-apps/api/event';
+import { DiffReviewPanel } from '../DiffReviewPanel/DiffReviewPanel';
 
 export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: number }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -11,9 +12,78 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
   const [useReasoning, setUseReasoning] = useState(false);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [tokensPerSec, setTokensPerSec] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [approvedFiles, setApprovedFiles] = useState<Set<string>>(new Set());
+  const [rejectedFiles, setRejectedFiles] = useState<Set<string>>(new Set());
+  
+  const [mentionSuggestions, setMentionSuggestions] = useState<MentionResult[]>([]);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadSession() {
+      try {
+        const sessions = await listSessions();
+        if (sessions.length > 0) {
+          const latest = sessions[0];
+          setSessionId(latest.id);
+          const msgs = await getSessionMessages(latest.id);
+          // Convert to our format (role, content)
+          setMessages(msgs.map(m => ({ role: m.role, content: m.content })));
+        }
+      } catch (e) {
+        console.error("Failed to load sessions", e);
+      }
+    }
+    loadSession();
+  }, []);
 
   const handleFocus = () => {
     preloadModel(useReasoning ? 'reasoning' : 'coder').catch(console.error);
+  };
+
+  useEffect(() => {
+    const handleSendToChat = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        setInput(prev => prev + (prev ? '\n' : '') + customEvent.detail);
+      }
+    };
+    window.addEventListener('send-to-chat', handleSendToChat);
+    return () => window.removeEventListener('send-to-chat', handleSendToChat);
+  }, []);
+
+  const handleInputChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    
+    // Check for mention trigger
+    const match = /(?:^|\s)@([^\s]*)$/.exec(val);
+    if (match) {
+      setMentionQuery(match[1]);
+      try {
+        const results = await searchMentions(match[1]);
+        setMentionSuggestions(results);
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      setMentionQuery(null);
+      setMentionSuggestions([]);
+    }
+  };
+
+  const insertMention = (label: string) => {
+    if (mentionQuery !== null) {
+      const match = /(?:^|\s)@([^\s]*)$/.exec(input);
+      if (match) {
+        const before = input.substring(0, match.index);
+        // If there was a space before the @, preserve it
+        const prefix = input[match.index] === ' ' ? ' ' : '';
+        setInput(before + prefix + '@' + label + ' ');
+      }
+    }
+    setMentionQuery(null);
+    setMentionSuggestions([]);
   };
 
   const sendMessage = async () => {
@@ -26,6 +96,21 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
     setIsStreaming(true);
     setStreamingMessage('');
     setTokensPerSec(null);
+
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      currentSessionId = crypto.randomUUID();
+      try {
+        await createSession(currentSessionId, "New Session");
+        setSessionId(currentSessionId);
+      } catch (e) {
+        console.error("Failed to create session", e);
+      }
+    }
+    
+    if (currentSessionId) {
+      await addMessage(currentSessionId, 'user', input).catch(console.error);
+    }
 
     const streamId = crypto.randomUUID();
     let accumulated = '';
@@ -68,6 +153,47 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
           setTokensPerSec(`${tps} t/s`);
         }
 
+        if (currentSessionId) {
+          addMessage(currentSessionId, 'assistant', accumulated).catch(console.error);
+          
+          // Auto-summarization at turn 20 (approx 40 messages)
+          const totalMessages = messages.length + 2; // previous + user + this assistant
+          if (totalMessages === 40) {
+            // Background summarization task
+            sendChatMessage(
+              "Summarize this conversation briefly in 1-2 sentences. Return ONLY the summary, no intro/outro.",
+              [...messages, newMsg, { role: 'assistant', content: accumulated }],
+              crypto.randomUUID(),
+              null,
+              null,
+              null,
+              false,
+              false // multiFileIntent
+            ).catch(console.error);
+            // Wait, we need to capture the stream for the summary to actually save it.
+            // A better way is to call an orchestrator command directly for summarizing, but we can do it by listening to the background stream ID.
+            const summaryStreamId = crypto.randomUUID();
+            let summaryAccumulated = '';
+            listen<ChatStreamChunk>(summaryStreamId, (ev) => {
+              if (ev.payload.message?.content) summaryAccumulated += ev.payload.message.content;
+              if (ev.payload.done && currentSessionId) {
+                updateSessionSummary(currentSessionId, summaryAccumulated).catch(console.error);
+              }
+            }).then(() => {
+              sendChatMessage(
+                "Summarize this conversation briefly in 1-2 sentences. Return ONLY the summary.",
+                [...messages, newMsg, { role: 'assistant', content: accumulated }],
+                summaryStreamId,
+                null,
+                null,
+                null,
+                false,
+                false // multiFileIntent
+              ).catch(console.error);
+            });
+          }
+        }
+
         setMessages(prev => [...prev, { role: 'assistant', content: accumulated }]);
         setStreamingMessage('');
         setIsStreaming(false);
@@ -78,6 +204,8 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
 
     try {
       const ext = props.activeFilePath ? props.activeFilePath.split('.').pop() || null : null;
+      const multiFileIntent = /(refactor|rename|move|update all|change everywhere|edit these files)/i.test(input);
+      
       await sendChatMessage(
         input,
         messages,
@@ -85,7 +213,8 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
         props.activeFilePath || null,
         props.activeLineNumber || null,
         ext,
-        useReasoning
+        useReasoning,
+        multiFileIntent
       );
     } catch (e) {
       window.clearTimeout(timeoutId);
@@ -100,7 +229,51 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
 
   const renderMessageContent = (content: string) => {
     if (!content) return null;
-    const parts = content.split(/(<think>[\s\S]*?(?:<\/think>|$))/gi);
+
+    const parts: React.ReactNode[] = [];
+
+    const fileChangeRegex = /<leaf_file_change>\s*<path>(.*?)<\/path>\s*<content>([\s\S]*?)<\/content>\s*<\/leaf_file_change>/g;
+    let match;
+    let lastIndex = 0;
+
+    while ((match = fileChangeRegex.exec(content)) !== null) {
+      const textBefore = content.substring(lastIndex, match.index);
+      if (textBefore) {
+        parts.push(<span key={`text-${lastIndex}`}>{renderTextWithThink(textBefore)}</span>);
+      }
+
+      const path = match[1].trim();
+      const newContent = match[2];
+      const changeKey = `${path}-${newContent.length}`; // Simple unique key
+
+      if (approvedFiles.has(changeKey)) {
+        parts.push(<div key={`approved-${lastIndex}`} style={{ color: 'green', margin: '4px 0' }}>✓ Approved changes to {path}</div>);
+      } else if (rejectedFiles.has(changeKey)) {
+        parts.push(<div key={`rejected-${lastIndex}`} style={{ color: 'red', margin: '4px 0' }}>✗ Rejected changes to {path}</div>);
+      } else {
+        parts.push(
+          <DiffReviewPanel
+            key={`diff-${lastIndex}`}
+            path={path}
+            newContent={newContent}
+            onApprove={() => setApprovedFiles(prev => new Set(prev).add(changeKey))}
+            onReject={() => setRejectedFiles(prev => new Set(prev).add(changeKey))}
+          />
+        );
+      }
+
+      lastIndex = fileChangeRegex.lastIndex;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(<span key={`text-${lastIndex}`}>{renderTextWithThink(content.substring(lastIndex))}</span>);
+    }
+
+    return parts;
+  };
+
+  const renderTextWithThink = (text: string) => {
+    const parts = text.split(/(<think>[\s\S]*?(?:<\/think>|$))/gi);
     return parts.map((part, i) => {
       if (part.toLowerCase().startsWith('<think>')) {
         const inner = part.substring(7).replace(/<\/think>$/i, '');
@@ -143,7 +316,35 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {mentionQuery !== null && mentionSuggestions.length > 0 && (
+          <div style={{
+            position: 'absolute',
+            bottom: '100%',
+            left: 0,
+            right: 0,
+            maxHeight: '200px',
+            overflowY: 'auto',
+            background: '#252526',
+            border: '1px solid #333',
+            borderBottom: 'none',
+            borderRadius: '4px 4px 0 0',
+            zIndex: 10
+          }}>
+            {mentionSuggestions.map((m, idx) => (
+              <div 
+                key={idx}
+                onClick={() => insertMention(m.label)}
+                style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#2a2d2e'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <span>{m.label}</span>
+                <span style={{ fontSize: '0.8em', color: '#888' }}>{m.kind}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
           <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
             <input 
@@ -160,7 +361,7 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
           <textarea 
             style={{ flex: 1, padding: '4px', resize: 'vertical', minHeight: '60px' }}
             value={input} 
-            onChange={e => setInput(e.target.value)}
+            onChange={handleInputChange}
             onFocus={handleFocus}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -168,7 +369,7 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
                 sendMessage();
               }
             }}
-            placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
+            placeholder="Type a message... (Use @ to mention files/symbols)"
             disabled={isStreaming}
           />
           <button onClick={sendMessage} disabled={isStreaming} style={{ marginLeft: '4px' }}>Send</button>

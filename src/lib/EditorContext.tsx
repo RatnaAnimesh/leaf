@@ -6,6 +6,8 @@ export interface OpenTab {
   savedContent: string;
   cursorPosition: { lineNumber: number; column: number };
   scrollTop: number;
+  isDiff?: boolean;
+  originalContent?: string;
 }
 
 export interface EditorState {
@@ -15,7 +17,7 @@ export interface EditorState {
 
 interface EditorContextType {
   state: EditorState;
-  openFile: (path: string, content: string) => void;
+  openFile: (path: string, content: string, isDiff?: boolean, originalContent?: string) => void;
   closeFile: (path: string) => void;
   setActiveTab: (path: string) => void;
   updateTabContent: (path: string, content: string) => void;
@@ -31,22 +33,28 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     activeTabPath: null,
   });
 
-  const openFile = (path: string, content: string) => {
+  const openFile = (path: string, content: string, isDiff?: boolean, originalContent?: string) => {
     setState((prev) => {
-      const existing = prev.openTabs.find((t) => t.path === path);
+      const existing = prev.openTabs.find((t) => t.path === path && t.isDiff === isDiff);
       if (existing) {
         return { ...prev, activeTabPath: path };
       }
+      // If we are opening a diff view for a file that is already open (or vice versa),
+      // we might want to either replace the tab or just add it. Let's replace any tab with the same path for simplicity.
+      const newTabs = prev.openTabs.filter(t => t.path !== path);
+      
       return {
         ...prev,
         openTabs: [
-          ...prev.openTabs,
+          ...newTabs,
           {
             path,
             content,
             savedContent: content,
             cursorPosition: { lineNumber: 1, column: 1 },
             scrollTop: 0,
+            isDiff,
+            originalContent,
           },
         ],
         activeTabPath: path,

@@ -36,3 +36,5 @@ tree-sitter-python = "0.23"
 rusqlite = { version = "0.32", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 sha2 = "0.10"
+tauri-plugin-pty = "0.3.0"
+git2 = { version = "0.21.0", features = ["vendored-libgit2"] }

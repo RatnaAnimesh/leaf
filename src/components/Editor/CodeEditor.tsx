@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import Editor from '@monaco-editor/react';
+import Editor, { DiffEditor } from '@monaco-editor/react';
 
 interface CodeEditorProps {
   filePath: string;
@@ -11,9 +11,11 @@ interface CodeEditorProps {
     cursorPosition: { lineNumber: number; column: number };
     scrollTop: number;
   };
+  isDiff?: boolean;
+  originalContent?: string;
 }
 
-export function CodeEditor({ filePath, content, onChange, language, onViewStateChange, initialViewState }: CodeEditorProps) {
+export function CodeEditor({ filePath, content, onChange, language, onViewStateChange, initialViewState, isDiff, originalContent }: CodeEditorProps) {
   const editorRef = useRef<any>(null);
 
   const handleEditorDidMount = (editor: any) => {
@@ -45,6 +47,24 @@ export function CodeEditor({ filePath, content, onChange, language, onViewStateC
       }
     }
   };
+
+  if (isDiff && originalContent !== undefined) {
+    return (
+      <DiffEditor
+        original={originalContent}
+        modified={content}
+        language={language}
+        onMount={handleEditorDidMount}
+        options={{
+          minimap: { enabled: false },
+          scrollBeyondLastLine: false,
+          automaticLayout: true,
+          readOnly: true,
+          renderSideBySide: true,
+        }}
+      />
+    );
+  }
 
   return (
     <Editor

@@ -47,3 +47,31 @@ export interface ModelStatus {
   sizeVramBytes: number | null;
   expiresAt: string | null;
 }
+
+export interface GitFile {
+  path: string;
+  status: string;
+}
+
+export interface RepoStatus {
+  branch: string;
+  ahead: number;
+  behind: number;
+  staged: GitFile[];
+  unstaged: GitFile[];
+  untracked: GitFile[];
+}
+
+export interface ChatSession {
+  id: string;
+  created_at: number;
+  updated_at: number;
+  title: string;
+  summary: string | null;
+}
+
+export interface MentionResult {
+  label: string;
+  kind: string;
+  file_path: string | null;
+}

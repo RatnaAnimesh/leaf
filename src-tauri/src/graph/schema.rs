@@ -38,11 +38,28 @@ pub fn setup(conn: &Connection) -> rusqlite::Result<()> {
             edge_type TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id TEXT PRIMARY KEY,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            summary TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file_id);
         CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
         CREATE INDEX IF NOT EXISTS idx_edges_from ON edges(from_symbol_id);
         CREATE INDEX IF NOT EXISTS idx_edges_to ON edges(to_symbol_id);
         CREATE INDEX IF NOT EXISTS idx_unresolved_name ON unresolved_edges(to_symbol_name);
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
         "#,
     )
 }
