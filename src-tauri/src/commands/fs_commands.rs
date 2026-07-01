@@ -1,5 +1,8 @@
 use ignore::WalkBuilder;
 use std::fs;
+use tauri::State;
+use crate::state::AppState;
+use crate::graph::index_file;
 
 #[derive(serde::Serialize, Clone)]
 pub struct FileNode {
@@ -9,12 +12,19 @@ pub struct FileNode {
     pub children: Option<Vec<FileNode>>,
 }
 
+#[derive(serde::Serialize)]
+pub struct ReadDirectoryResult {
+    pub nodes: Vec<FileNode>,
+    pub warnings: Vec<String>,
+}
+
 #[tauri::command]
-pub async fn read_directory(path: String) -> Result<Vec<FileNode>, String> {
+pub async fn read_directory(path: String) -> Result<ReadDirectoryResult, String> {
     let mut builder = WalkBuilder::new(&path);
     builder.max_depth(Some(1)).hidden(false);
 
     let mut nodes = Vec::new();
+    let mut warnings = Vec::new();
     let root_path = std::path::Path::new(&path);
 
     for result in builder.build() {
@@ -40,8 +50,7 @@ pub async fn read_directory(path: String) -> Result<Vec<FileNode>, String> {
                 });
             }
             Err(err) => {
-                // Ignore errors for unreadable files/dirs, just skip them for now
-                eprintln!("Error reading directory entry: {}", err);
+                warnings.push(format!("Error reading directory entry: {}", err));
             }
         }
     }
@@ -51,15 +60,43 @@ pub async fn read_directory(path: String) -> Result<Vec<FileNode>, String> {
         b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name))
     });
 
-    Ok(nodes)
+    Ok(ReadDirectoryResult { nodes, warnings })
 }
 
 #[tauri::command]
 pub async fn read_file(path: String) -> Result<String, String> {
-    fs::read_to_string(&path).map_err(|e| format!("Failed to read file {}: {}", path, e))
+    let meta = fs::metadata(&path).map_err(|e| format!("Failed to read metadata for {}: {}", path, e))?;
+    if meta.len() > 5 * 1024 * 1024 {
+        return Err(format!("File {} is too large (over 5MB limit).", path));
+    }
+    
+    let content_bytes = fs::read(&path).map_err(|e| format!("Failed to read file bytes {}: {}", path, e))?;
+    
+    if content_inspector::inspect(&content_bytes).is_binary() {
+        return Err(format!("File {} appears to be binary and cannot be opened.", path));
+    }
+    
+    String::from_utf8(content_bytes).map_err(|e| format!("File {} contains invalid UTF-8: {}", path, e))
 }
 
 #[tauri::command]
-pub async fn write_file(path: String, content: String) -> Result<(), String> {
-    fs::write(&path, content).map_err(|e| format!("Failed to write file {}: {}", path, e))
+pub async fn write_file(path: String, content: String, state: State<'_, AppState>) -> Result<(), String> {
+    let tmp_path = format!("{}.tmp", path);
+    fs::write(&tmp_path, &content).map_err(|e| format!("Failed to write temp file {}: {}", tmp_path, e))?;
+    fs::rename(&tmp_path, &path).map_err(|e| format!("Failed to rename temp file to target {}: {}", path, e))?;
+
+    let graph_conn = state.graph_conn.clone();
+    tauri::async_runtime::spawn(async move {
+        let ext = std::path::Path::new(&path).extension().and_then(|e| e.to_str()).unwrap_or("");
+        let lang = if ext == "rs" { "rust" } else if ext == "py" { "python" } else { "" };
+        
+        if lang != "" {
+            let conn_guard = graph_conn.lock().await;
+            if let Err(e) = index_file(&conn_guard, &path, &content, lang) {
+                eprintln!("Failed to index file {}: {}", path, e);
+            }
+        }
+    });
+
+    Ok(())
 }

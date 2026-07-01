@@ -1,7 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { FileNode, WorkspaceConfig, ChatMessage } from './types';
 
-export async function readDirectory(path: string): Promise<FileNode[]> {
+export interface ReadDirectoryResult {
+  nodes: FileNode[];
+  warnings: string[];
+}
+
+export async function readDirectory(path: string): Promise<ReadDirectoryResult> {
   return invoke('read_directory', { path });
 }
 
@@ -21,8 +26,28 @@ export async function saveWorkspaceConfig(workspaceRoot: string, config: Workspa
   return invoke('save_workspace_config', { workspaceRoot, config });
 }
 
-export async function sendChatMessage(model: string, messages: ChatMessage[], streamId: string): Promise<void> {
-  return invoke('send_chat_message', { model, messages, streamId });
+export async function sendChatMessage(
+  userMessage: string,
+  history: ChatMessage[],
+  streamId: string,
+  anchorFile: string | null,
+  anchorLine: number | null,
+  activeFileExtension: string | null,
+  useReasoning: boolean
+): Promise<void> {
+  return invoke('send_chat_message', { 
+    userMessage, 
+    history, 
+    streamId,
+    anchorFile,
+    anchorLine,
+    activeFileExtension,
+    useReasoning
+  });
+}
+
+export async function preloadModel(role: 'coder' | 'reasoning'): Promise<void> {
+  return invoke('preload_model', { role });
 }
 
 export async function startWatchingWorkspace(path: string): Promise<void> {

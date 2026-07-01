@@ -34,4 +34,16 @@ export interface ChatStreamChunk {
   model: string;
   message: ChatMessage | null;
   done: boolean;
+  eval_count?: number | null;
+  eval_duration?: number | null;
+}
+
+export type ModelRole = 'coder' | 'reasoning';
+export type LoadState = 'unloaded' | 'loading' | 'ready' | 'unloading';
+
+export interface ModelStatus {
+  role: ModelRole;
+  state: LoadState;
+  sizeVramBytes: number | null;
+  expiresAt: string | null;
 }

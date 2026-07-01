@@ -40,7 +40,11 @@ export function FileExplorer({ workspaceRoot, onFileSelect }: FileExplorerProps)
 
   const loadDir = async (path: string) => {
     try {
-      return await readDirectory(path);
+      const result = await readDirectory(path);
+      if (result.warnings && result.warnings.length > 0) {
+        result.warnings.forEach(w => console.warn(w));
+      }
+      return result.nodes;
     } catch (e) {
       console.error('Failed to read dir', e);
       return [];

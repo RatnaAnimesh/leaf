@@ -112,7 +112,7 @@ function LeafIDE() {
               minSize={15} 
               collapsible={true}
             >
-              {!chatCollapsed && <ChatPanel />}
+              {!chatCollapsed && <ChatPanel activeFilePath={activeTab?.path} activeLineNumber={activeTab?.cursorPosition?.lineNumber} />}
             </Panel>
           </PanelGroup>
         </Panel>

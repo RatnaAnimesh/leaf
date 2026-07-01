@@ -25,6 +25,10 @@ pub struct WorkspaceConfig {
     pub left_split: Vec<f64>,
     pub terminal_drawer: TerminalDrawerConfig,
     pub window_bounds: WindowBounds,
+    pub ollama_base_url: Option<String>,
+    pub coder_model: Option<String>,
+    pub reasoning_model: Option<String>,
+    pub idle_timeout_seconds: Option<u64>,
 }
 
 impl Default for WorkspaceConfig {
@@ -43,22 +47,48 @@ impl Default for WorkspaceConfig {
                 x: None,
                 y: None,
             },
+            ollama_base_url: None,
+            coder_model: None,
+            reasoning_model: None,
+            idle_timeout_seconds: None,
         }
     }
 }
 
 #[tauri::command]
-pub async fn load_workspace_config(workspace_root: String) -> Result<WorkspaceConfig, String> {
+pub async fn load_workspace_config(
+    workspace_root: String,
+    app_state: tauri::State<'_, crate::state::AppState>,
+) -> Result<WorkspaceConfig, String> {
     let mut config_path = PathBuf::from(&workspace_root);
     config_path.push(".leaf");
     config_path.push("layout.json");
 
-    if !config_path.exists() {
-        return Ok(WorkspaceConfig::default());
+    let config = if !config_path.exists() {
+        WorkspaceConfig::default()
+    } else {
+        let content = fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or_else(|_| WorkspaceConfig::default())
+    };
+
+    // Update ModelOrchestrator based on config
+    {
+        let mut orchestrator = app_state.orchestrator.lock().await;
+        if let Some(url) = &config.ollama_base_url {
+            orchestrator.ollama_base_url = url.clone();
+        }
+        if let Some(coder) = &config.coder_model {
+            orchestrator.coder.model_name = coder.clone();
+        }
+        if let Some(reasoning) = &config.reasoning_model {
+            orchestrator.reasoning.model_name = reasoning.clone();
+        }
+        if let Some(timeout) = config.idle_timeout_seconds {
+            orchestrator.idle_timeout = tokio::time::Duration::from_secs(timeout);
+        }
     }
 
-    let content = fs::read_to_string(config_path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&content).map_err(|e| e.to_string())
+    Ok(config)
 }
 
 #[tauri::command]

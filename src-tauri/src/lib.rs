@@ -3,9 +3,15 @@ mod config;
 mod fs_watch;
 mod ollama_client;
 mod state;
+pub mod graph;
+pub mod models;
 
 use state::AppState;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use tokio::sync::Mutex as TokioMutex;
+use tauri::Manager;
+use models::orchestrator::{ModelOrchestrator, ModelSlot, ModelRole, LoadState};
+use std::time::Duration;
 
 #[tauri::command]
 fn start_watching_workspace(path: String, app_handle: tauri::AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
@@ -17,10 +23,63 @@ fn start_watching_workspace(path: String, app_handle: tauri::AppHandle, state: t
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let leaf_dir = std::path::Path::new(".leaf");
+    if !leaf_dir.exists() {
+        std::fs::create_dir_all(leaf_dir).expect("failed to create .leaf directory");
+    }
+    let db_path = leaf_dir.join("graph.db");
+    let conn = rusqlite::Connection::open(&db_path).expect("failed to open graph.db");
+    conn.pragma_update(None, "journal_mode", "WAL").expect("failed to set WAL mode");
+    graph::schema::setup(&conn).expect("failed to setup schema");
+
+    let graph_conn = Arc::new(TokioMutex::new(conn));
+
+    let orchestrator = ModelOrchestrator {
+        coder: ModelSlot {
+            role: ModelRole::Coder,
+            model_name: "ornith:latest".to_string(),
+            load_state: LoadState::Unloaded,
+            last_used: None,
+            size_vram_bytes: None,
+            expires_at: None,
+        },
+        reasoning: ModelSlot {
+            role: ModelRole::Reasoning,
+            model_name: "gemma4:latest".to_string(),
+            load_state: LoadState::Unloaded,
+            last_used: None,
+            size_vram_bytes: None,
+            expires_at: None,
+        },
+        active_role: None,
+        idle_timeout: Duration::from_secs(300),
+        ollama_base_url: "http://localhost:11434".to_string(),
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(AppState {
             watcher: Mutex::new(None),
+            graph_conn,
+            orchestrator: Arc::new(TokioMutex::new(orchestrator)),
+            workspace_root: Mutex::new(None),
+        })
+        .setup(|app| {
+            let app_handle_idle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(60));
+                loop {
+                    interval.tick().await;
+                    let state = app_handle_idle.state::<AppState>();
+                    let mut orchestrator = state.orchestrator.lock().await;
+                    let client = reqwest::Client::new();
+                    let base_url = orchestrator.ollama_base_url.clone();
+                    if let Err(e) = orchestrator.idle_check(&client, &base_url).await {
+                        eprintln!("idle check error: {}", e);
+                    }
+                }
+            });
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             config::load_workspace_config,
@@ -29,6 +88,9 @@ pub fn run() {
             commands::fs_commands::read_file,
             commands::fs_commands::write_file,
             commands::model_commands::send_chat_message,
+            commands::model_commands::preload_model,
+            commands::graph_commands::rebuild_index,
+            commands::graph_commands::get_index_stats,
             start_watching_workspace,
         ])
         .run(tauri::generate_context!())
