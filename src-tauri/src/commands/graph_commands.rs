@@ -26,7 +26,19 @@ pub async fn rebuild_index(path: String, state: State<'_, AppState>) -> Result<(
         // Find all rust/python files
         let mut files_to_index = Vec::new();
         let mut builder = WalkBuilder::new(&path_clone);
-        builder.hidden(false);
+        // By default, WalkBuilder respects .gitignore and hidden files (hidden(true) is default)
+        builder.filter_entry(|e| {
+            let path = e.path();
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if path.is_dir() {
+                // Ignore common dependency and build directories
+                if matches!(name, "node_modules" | "target" | "dist" | "build" | "__pycache__" | ".venv" | "venv" | "env" | ".env") {
+                    return false;
+                }
+            }
+            true
+        });
+        
         for result in builder.build() {
             if let Ok(entry) = result {
                 if !entry.path().is_dir() {
@@ -42,11 +54,12 @@ pub async fn rebuild_index(path: String, state: State<'_, AppState>) -> Result<(
             if let Ok(content) = fs::read_to_string(&file_path) {
                 let ext = std::path::Path::new(&file_path).extension().and_then(|e| e.to_str()).unwrap_or("");
                 let lang = if ext == "rs" { "rust" } else { "python" };
-                // CRITICAL: We cannot hold a non-Send rusqlite::Connection across await points.
-                // We lock, perform the synchronous rusqlite work (index_file), and drop the lock
-                // *before* any await point.
                 
                 let conn_guard = graph_conn.lock().await;
+                
+                // Clear old files for this exact file path to ensure freshness
+                let _ = conn_guard.execute("DELETE FROM files WHERE path = ?1", [&file_path]);
+
                 let _ = index_file(&conn_guard, &file_path, &content, lang);
             }
         }
@@ -108,4 +121,90 @@ pub async fn search_mentions(query: String, state: State<'_, AppState>) -> Resul
     }
 
     Ok(results)
+}
+
+#[derive(serde::Serialize)]
+pub struct GraphNode {
+    pub id: String,
+    pub label: String,
+    pub group: String,
+    pub kind: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+pub struct GraphLink {
+    pub source: String,
+    pub target: String,
+    pub label: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct GraphData {
+    pub nodes: Vec<GraphNode>,
+    pub links: Vec<GraphLink>,
+}
+
+#[tauri::command]
+pub async fn get_full_graph(workspace_root: String, state: State<'_, AppState>) -> Result<GraphData, String> {
+    let conn = state.graph_conn.lock().await;
+    let mut nodes = Vec::new();
+    let mut links = Vec::new();
+
+    let pattern = format!("{}%", workspace_root);
+
+    // 1. Fetch Files
+    let mut stmt = conn.prepare("SELECT id, path FROM files WHERE path LIKE ?1").map_err(|e| e.to_string())?;
+    let mut file_rows = stmt.query([&pattern]).map_err(|e| e.to_string())?;
+    while let Ok(Some(row)) = file_rows.next() {
+        let id: i64 = row.get(0).unwrap_or(0);
+        let path: String = row.get(1).unwrap_or_default();
+        let basename = std::path::Path::new(&path).file_name().and_then(|n| n.to_str()).unwrap_or(&path).to_string();
+        nodes.push(GraphNode {
+            id: format!("file_{}", id),
+            label: basename,
+            group: "file".to_string(),
+            kind: None,
+        });
+    }
+
+    // 2. Fetch Symbols
+    let mut stmt = conn.prepare("SELECT id, file_id, name, kind FROM symbols WHERE file_id IN (SELECT id FROM files WHERE path LIKE ?1)").map_err(|e| e.to_string())?;
+    let mut sym_rows = stmt.query([&pattern]).map_err(|e| e.to_string())?;
+    while let Ok(Some(row)) = sym_rows.next() {
+        let id: i64 = row.get(0).unwrap_or(0);
+        let file_id: i64 = row.get(1).unwrap_or(0);
+        let name: String = row.get(2).unwrap_or_default();
+        let kind: String = row.get(3).unwrap_or_default();
+        
+        nodes.push(GraphNode {
+            id: format!("sym_{}", id),
+            label: name,
+            group: "symbol".to_string(),
+            kind: Some(kind),
+        });
+
+        // Implicit edge from file to symbol
+        links.push(GraphLink {
+            source: format!("file_{}", file_id),
+            target: format!("sym_{}", id),
+            label: "contains".to_string(),
+        });
+    }
+
+    // 3. Fetch Edges
+    let mut stmt = conn.prepare("SELECT from_symbol_id, to_symbol_id, edge_type FROM edges WHERE to_symbol_id IS NOT NULL AND from_symbol_id IN (SELECT id FROM symbols WHERE file_id IN (SELECT id FROM files WHERE path LIKE ?1))").map_err(|e| e.to_string())?;
+    let mut edge_rows = stmt.query([&pattern]).map_err(|e| e.to_string())?;
+    while let Ok(Some(row)) = edge_rows.next() {
+        let from_id: i64 = row.get(0).unwrap_or(0);
+        let to_id: i64 = row.get(1).unwrap_or(0);
+        let edge_type: String = row.get(2).unwrap_or_default();
+        
+        links.push(GraphLink {
+            source: format!("sym_{}", from_id),
+            target: format!("sym_{}", to_id),
+            label: edge_type,
+        });
+    }
+
+    Ok(GraphData { nodes, links })
 }

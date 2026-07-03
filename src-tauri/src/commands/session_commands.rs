@@ -41,7 +41,7 @@ pub async fn list_sessions(state: tauri::State<'_, AppState>) -> Result<Vec<Chat
             sessions.push(session);
         }
     }
-    
+
     Ok(sessions)
 }
 
@@ -71,17 +71,18 @@ pub async fn get_session_messages(session_id: String, state: tauri::State<'_, Ap
 }
 
 #[tauri::command]
-pub async fn create_session(id: String, title: String, state: tauri::State<'_, AppState>) -> Result<ChatSession, String> {
+pub async fn create_session(id: String, title: String, workspace_root: String, state: tauri::State<'_, AppState>) -> Result<ChatSession, String> {
     let conn = state.graph_conn.lock().await;
+    
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
     
     conn.execute(
-        "INSERT INTO chat_sessions (id, created_at, updated_at, title) VALUES (?1, ?2, ?3, ?4)",
-        (id.clone(), now, now, title.clone()),
+        "INSERT INTO chat_sessions (id, workspace_root, created_at, updated_at, title) VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![id, workspace_root, now, now, title],
     ).map_err(|e| e.to_string())?;
     
     Ok(ChatSession {
-        id,
+        id: id.clone(),
         created_at: now,
         updated_at: now,
         title,

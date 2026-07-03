@@ -7,4 +7,5 @@ pub struct AppState {
     pub graph_conn: Arc<Mutex<rusqlite::Connection>>,
     pub orchestrator: Arc<Mutex<crate::models::orchestrator::ModelOrchestrator>>,
     pub workspace_root: std::sync::Mutex<Option<String>>,
+    pub cancel_flags: Arc<Mutex<std::collections::HashMap<String, Arc<std::sync::atomic::AtomicBool>>>>,
 }

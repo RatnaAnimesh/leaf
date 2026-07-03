@@ -138,9 +138,20 @@ pub async fn send_chat_message(
         keep_alive: "5m".to_string(),
     };
 
-    stream_chat(chat_request, app_handle.clone(), &stream_id, &base_url)
+    let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    {
+        let mut flags = app_state.cancel_flags.lock().await;
+        flags.insert(stream_id.clone(), cancel_flag.clone());
+    }
+
+    stream_chat(chat_request, app_handle.clone(), &stream_id, &base_url, cancel_flag)
         .await
         .map_err(|e| e.to_string())?;
+
+    {
+        let mut flags = app_state.cancel_flags.lock().await;
+        flags.remove(&stream_id);
+    }
 
     // Step 5: release active_role after inference completes.
     {
@@ -168,16 +179,29 @@ pub async fn preload_model(
         _ => return Err(format!("unknown model role: {}", role)),
     };
 
-    // Spawn — do not await. The command returns to the frontend immediately.
+    // Await the load directly so the frontend can track loading state
     let orchestrator_arc = app_state.orchestrator.clone();
-    tauri::async_runtime::spawn(async move {
-        let mut orchestrator = orchestrator_arc.lock().await;
-        let client = reqwest::Client::new();
-        let base_url = orchestrator.ollama_base_url.clone();
-        if let Err(e) = orchestrator.ensure_model_loaded(model_role, &client, &base_url).await {
-            eprintln!("predictive preload failed: {}", e);
-        }
-    });
+    let mut orchestrator = orchestrator_arc.lock().await;
+    let client = reqwest::Client::new();
+    let base_url = orchestrator.ollama_base_url.clone();
+    
+    if let Err(e) = orchestrator.ensure_model_loaded(model_role, &client, &base_url).await {
+        eprintln!("preload failed: {}", e);
+        // We don't return error to frontend to avoid breaking the UI flow, 
+        // just log it. The UI will just finish loading state.
+    }
 
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn cancel_chat_message(
+    stream_id: String,
+    app_state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let mut flags = app_state.cancel_flags.lock().await;
+    if let Some(flag) = flags.remove(&stream_id) {
+        flag.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
     Ok(())
 }

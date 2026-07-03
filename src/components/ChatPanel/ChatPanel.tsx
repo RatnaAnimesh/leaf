@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { ChatMessage, ChatStreamChunk, ModelStatus, MentionResult } from '../../lib/types';
-import { sendChatMessage, preloadModel, listSessions, getSessionMessages, createSession, addMessage, updateSessionSummary, searchMentions } from '../../lib/tauri-commands';
+import { cancelChatMessage, sendChatMessage, preloadModel, listSessions, getSessionMessages, createSession, addMessage, updateSessionSummary, searchMentions } from '../../lib/tauri-commands';
 import { listen } from '@tauri-apps/api/event';
 import { DiffReviewPanel } from '../DiffReviewPanel/DiffReviewPanel';
-import { FileText, X, Plus, Send } from 'lucide-react';
+import { FileText, X, Plus, Send, Brain, Code, Loader2, Square } from 'lucide-react';
 
-export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: number }) {
+export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: string, activeLineNumber?: number }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [streamingMessage, setStreamingMessage] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [useReasoning, setUseReasoning] = useState(false);
+  const [isLoadingModel, setIsLoadingModel] = useState(false);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [tokensPerSec, setTokensPerSec] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -21,13 +22,14 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
 
   const [addedContext, setAddedContext] = useState<MentionResult[]>([]);
+  const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
   const [showContextSearch, setShowContextSearch] = useState(false);
   const [contextSearchQuery, setContextSearchQuery] = useState('');
 
   useEffect(() => {
     async function loadSession() {
       try {
-        const sessions = await listSessions();
+        const sessions = await listSessions(props.workspaceRoot);
         if (sessions.length > 0) {
           const latest = sessions[0];
           setSessionId(latest.id);
@@ -43,7 +45,24 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
   }, []);
 
   const handleFocus = () => {
-    preloadModel(useReasoning ? 'reasoning' : 'coder').catch(console.error);
+    if (!isLoadingModel) {
+      preloadModel(useReasoning ? 'reasoning' : 'coder').catch(console.error);
+    }
+  };
+
+  const handleToggleModel = async () => {
+    if (isStreaming || isLoadingModel) return;
+    const nextReasoning = !useReasoning;
+    setUseReasoning(nextReasoning);
+    
+    setIsLoadingModel(true);
+    try {
+      await preloadModel(nextReasoning ? 'reasoning' : 'coder');
+    } catch (e) {
+      console.error("Failed to preload model:", e);
+    } finally {
+      setIsLoadingModel(false);
+    }
   };
 
   useEffect(() => {
@@ -101,6 +120,21 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
     setMentionSuggestions([]);
   };
 
+  const stopResponse = async () => {
+    if (activeStreamId) {
+      await cancelChatMessage(activeStreamId);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!isStreaming) {
+        sendMessage();
+      }
+    }
+  };
+
   const sendMessage = async () => {
     if ((!input.trim() && addedContext.length === 0) || isStreaming) return;
     
@@ -123,7 +157,7 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
     if (!currentSessionId) {
       currentSessionId = crypto.randomUUID();
       try {
-        await createSession(currentSessionId, "New Session");
+        await createSession(currentSessionId, "New Session", props.workspaceRoot);
         setSessionId(currentSessionId);
       } catch (e) {
         console.error("Failed to create session", e);
@@ -135,6 +169,7 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
     }
 
     const streamId = crypto.randomUUID();
+    setActiveStreamId(streamId);
     let accumulated = '';
     let timeoutId: number | undefined;
 
@@ -147,6 +182,7 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
       setMessages(prev => [...prev, { role: 'assistant', content: accumulated + '\n\n[Error: Stream timed out after 3 minutes]' }]);
       setStreamingMessage('');
       setIsStreaming(false);
+      setActiveStreamId(null);
     };
 
     const resetTimeout = () => {
@@ -219,6 +255,7 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
         setMessages(prev => [...prev, { role: 'assistant', content: accumulated }]);
         setStreamingMessage('');
         setIsStreaming(false);
+        setActiveStreamId(null);
       }
     });
 
@@ -401,25 +438,56 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
             ))}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-          <select 
-            value={useReasoning ? 'reasoning' : 'coder'} 
-            onChange={(e) => setUseReasoning(e.target.value === 'reasoning')}
-            disabled={isStreaming}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+          <div 
             style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
               backgroundColor: '#1e1e1e', 
-              color: '#cccccc', 
               border: '1px solid #333333', 
-              padding: '4px 12px', 
-              borderRadius: '16px',
-              cursor: 'pointer',
-              outline: 'none',
-              fontSize: '0.8rem'
+              borderRadius: '20px',
+              padding: '4px',
+              width: '100%',
+              position: 'relative',
+              cursor: (isStreaming || isLoadingModel) ? 'not-allowed' : 'pointer',
+              opacity: (isStreaming || isLoadingModel) ? 0.7 : 1,
             }}
+            onClick={handleToggleModel}
           >
-            <option value="coder">Coder Model (Ornith)</option>
-            <option value="reasoning">Reasoning Model (Gemma)</option>
-          </select>
+            <div 
+              style={{
+                position: 'absolute',
+                top: '4px',
+                bottom: '4px',
+                width: 'calc(50% - 4px)',
+                left: useReasoning ? 'calc(50%)' : '4px',
+                backgroundColor: '#37373d',
+                borderRadius: '16px',
+                transition: 'left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+              }}
+            />
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px', zIndex: 1, color: !useReasoning ? '#fff' : '#888', transition: 'color 0.3s' }}>
+              {!useReasoning && isLoadingModel ? (
+                <Loader2 className="animate-spin" size={14} style={{ marginRight: '6px', animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Code size={14} style={{ marginRight: '6px' }} />
+              )}
+              <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                {(!useReasoning && isLoadingModel) ? 'Loading...' : 'Coder'}
+              </span>
+            </div>
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px', zIndex: 1, color: useReasoning ? '#fff' : '#888', transition: 'color 0.3s' }}>
+              {useReasoning && isLoadingModel ? (
+                <Loader2 className="animate-spin" size={14} style={{ marginRight: '6px', animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Brain size={14} style={{ marginRight: '6px' }} />
+              )}
+              <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                {(useReasoning && isLoadingModel) ? 'Loading...' : 'Reasoning'}
+              </span>
+            </div>
+          </div>
         </div>
 
         {addedContext.length > 0 && (
@@ -528,36 +596,55 @@ export function ChatPanel(props: { activeFilePath?: string, activeLineNumber?: n
             value={input} 
             onChange={handleInputChange}
             onFocus={handleFocus}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
+            onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             disabled={isStreaming}
           />
-          <button 
-            onClick={sendMessage} 
-            disabled={isStreaming} 
-            style={{ 
-              backgroundColor: '#007acc',
-              color: 'white',
-              border: 'none',
-              padding: '0 16px',
-              height: '36px',
-              borderRadius: '18px',
-              cursor: isStreaming ? 'not-allowed' : 'pointer',
-              opacity: isStreaming ? 0.6 : 1,
-              outline: 'none',
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Send size={16} />
-          </button>
+          {isStreaming ? (
+            <button 
+              onClick={stopResponse}
+              title="Stop Response"
+              style={{ 
+                backgroundColor: '#cc3333',
+                color: 'white',
+                border: 'none',
+                padding: '0 16px',
+                height: '36px',
+                borderRadius: '18px',
+                cursor: 'pointer',
+                outline: 'none',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Square size={16} fill="currentColor" />
+            </button>
+          ) : (
+            <button 
+              onClick={sendMessage}
+              disabled={(!input.trim() && addedContext.length === 0)} 
+              title="Send Message"
+              style={{ 
+                backgroundColor: '#007acc',
+                color: 'white',
+                border: 'none',
+                padding: '0 16px',
+                height: '36px',
+                borderRadius: '18px',
+                cursor: (!input.trim() && addedContext.length === 0) ? 'not-allowed' : 'pointer',
+                opacity: (!input.trim() && addedContext.length === 0) ? 0.6 : 1,
+                outline: 'none',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Send size={16} />
+            </button>
+          )}
         </div>
         
         {/* Model Status Pill */}

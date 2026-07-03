@@ -5,20 +5,23 @@ import { SourceControlPanel } from './components/FileExplorer/SourceControlPanel
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
 import { CodeEditor } from './components/Editor/CodeEditor';
 import { TerminalDrawer } from './components/TerminalDrawer/TerminalDrawer';
-import { Folder, GitBranch, X, Circle } from 'lucide-react';
+import { Folder, GitBranch, X, Circle, Network, Home } from 'lucide-react';
 import { EditorProvider, useEditor } from './lib/EditorContext';
-import { loadWorkspaceConfig, saveWorkspaceConfig, readFile, writeFile, startWatchingWorkspace, addRecentWorkspace } from './lib/tauri-commands';
+import { loadWorkspaceConfig, saveWorkspaceConfig, readFile, writeFile, startWatchingWorkspace, addRecentWorkspace, rebuildIndex } from './lib/tauri-commands';
 import { WorkspaceConfig } from './lib/types';
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen';
+import { GraphViewer } from './components/GraphViewer/GraphViewer';
 
 interface LeafIDEProps {
   workspaceRoot: string;
+  onSwitchProject: () => void;
 }
 
-function LeafIDE({ workspaceRoot }: LeafIDEProps) {
+function LeafIDE({ workspaceRoot, onSwitchProject }: LeafIDEProps) {
   const [config, setConfig] = useState<WorkspaceConfig | null>(null);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
   const [leftTab, setLeftTab] = useState<'explorer' | 'git'>('explorer');
   const { state, openFile, closeFile, updateTabContent, updateTabSavedContent, updateTabViewState, setActiveTab } = useEditor();
 
@@ -26,6 +29,7 @@ function LeafIDE({ workspaceRoot }: LeafIDEProps) {
     loadWorkspaceConfig(workspaceRoot).then(setConfig);
     startWatchingWorkspace(workspaceRoot).catch(console.error);
     addRecentWorkspace(workspaceRoot).catch(console.error);
+    rebuildIndex(workspaceRoot).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -133,9 +137,25 @@ function LeafIDE({ workspaceRoot }: LeafIDEProps) {
         >
           <GitBranch size={24} strokeWidth={1.5} />
         </button>
+        <button 
+          style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: showGraph ? colors.textPrimary : colors.textSecondary, border: 'none', cursor: 'pointer', borderLeft: showGraph ? `2px solid ${colors.accent}` : '2px solid transparent', transition: 'color 0.2s ease' }}
+          title="Knowledge Graph"
+          onClick={() => setShowGraph(true)}
+        >
+          <Network size={24} strokeWidth={1.5} />
+        </button>
+        <div style={{ flex: 1 }}></div>
+        <button 
+          style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: '#888', border: 'none', cursor: 'pointer' }}
+          title="Switch Project"
+          onClick={onSwitchProject}
+        >
+          <Home size={24} strokeWidth={1.5} />
+        </button>
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {showGraph && <GraphViewer workspaceRoot={workspaceRoot} onClose={() => setShowGraph(false)} />}
         <PanelGroup direction="horizontal" onLayout={(sizes) => handleLayoutChange(sizes, 'main')}>
         <Panel defaultSize={config.mainSplit[0] || 50} minSize={20} maxSize={70}>
           <PanelGroup direction="vertical" onLayout={(sizes) => handleLayoutChange(sizes, 'left')}>
@@ -170,7 +190,7 @@ function LeafIDE({ workspaceRoot }: LeafIDEProps) {
               minSize={15} 
               collapsible={true}
             >
-              {!chatCollapsed && <ChatPanel activeFilePath={activeTab?.path} activeLineNumber={activeTab?.cursorPosition?.lineNumber} />}
+              {!chatCollapsed && <ChatPanel workspaceRoot={workspaceRoot} activeFilePath={activeTab?.path} activeLineNumber={activeTab?.cursorPosition?.lineNumber} />}
             </Panel>
           </PanelGroup>
         </Panel>
@@ -257,7 +277,7 @@ export default function App() {
 
   return (
     <EditorProvider>
-      <LeafIDE workspaceRoot={workspaceRoot} />
+      <LeafIDE workspaceRoot={workspaceRoot} onSwitchProject={() => setWorkspaceRoot(null)} />
     </EditorProvider>
   );
 }

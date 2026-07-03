@@ -22,6 +22,12 @@ pub struct ReadDirectoryResult {
 pub async fn read_directory(path: String) -> Result<ReadDirectoryResult, String> {
     let mut builder = WalkBuilder::new(&path);
     builder.max_depth(Some(1)).hidden(false);
+    
+    // Explicitly filter out noise directories/files from the File Explorer
+    builder.filter_entry(|e| {
+        let name = e.file_name().to_string_lossy();
+        !matches!(name.as_ref(), ".leaf" | ".git" | ".DS_Store" | ".venv" | "__pycache__" | "node_modules" | "target")
+    });
 
     let mut nodes = Vec::new();
     let mut warnings = Vec::new();

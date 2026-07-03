@@ -29,6 +29,7 @@ pub async fn stream_chat(
     app_handle: tauri::AppHandle,
     stream_event_name: &str,
     base_url: &str,
+    cancel_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<(), anyhow::Error> {
     let client = reqwest::Client::new();
     let response = client
@@ -44,6 +45,22 @@ pub async fn stream_chat(
     let mut buffer: Vec<u8> = Vec::new();
 
     while let Some(chunk) = stream.next().await {
+        if cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
+            let cancel_msg = ChatMessage {
+                role: "assistant".to_string(),
+                content: "\n\n[Stopped by user]".to_string(),
+            };
+            let cancel_chunk = ChatStreamChunk {
+                model: request.model.clone(),
+                message: Some(cancel_msg),
+                done: true,
+                eval_count: None,
+                eval_duration: None,
+            };
+            let _ = app_handle.emit(stream_event_name, &cancel_chunk);
+            return Ok(());
+        }
+
         let bytes = chunk?;
         buffer.extend_from_slice(&bytes);
         

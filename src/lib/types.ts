@@ -75,3 +75,21 @@ export interface MentionResult {
   kind: string;
   file_path: string | null;
 }
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  group: string;
+  kind: string | null;
+}
+
+export interface GraphLink {
+  source: string;
+  target: string;
+  label: string;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { readDirectory, createFile, createDir, renameFile, deleteFile } from '../../lib/tauri-commands';
 import { FileNode } from '../../lib/types';
 import { listen } from '@tauri-apps/api/event';
-import { Folder, FileText, ChevronRight } from 'lucide-react';
+import { Folder, ChevronRight } from 'lucide-react';
+import { FileIcon } from './FileIcon';
 
 interface FileExplorerProps {
   workspaceRoot: string;
@@ -185,8 +186,8 @@ export function FileExplorer({ workspaceRoot, onFileSelect }: FileExplorerProps)
                 onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', gap: '8px' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', opacity: 0.8, color: node.is_dir ? colors.accent : colors.textSecondary }}>
-                    {node.is_dir ? <Folder size={16} fill={node.is_dir ? colors.accent : 'none'} fillOpacity={0.2} /> : <FileText size={16} />}
+                  <span style={{ display: 'flex', alignItems: 'center', opacity: node.is_dir ? 0.8 : 1, color: node.is_dir ? colors.accent : colors.textSecondary }}>
+                    {node.is_dir ? <Folder size={16} fill={node.is_dir ? colors.accent : 'none'} fillOpacity={0.2} /> : <FileIcon name={node.name} size={16} />}
                   </span>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{node.name}</span>
                 </div>

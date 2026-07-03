@@ -31,6 +31,7 @@ pub fn run() {
     let db_path = leaf_dir.join("graph.db");
     let conn = rusqlite::Connection::open(&db_path).expect("failed to open graph.db");
     conn.pragma_update(None, "journal_mode", "WAL").expect("failed to set WAL mode");
+    conn.pragma_update(None, "foreign_keys", "ON").expect("failed to set foreign keys");
     graph::schema::setup(&conn).expect("failed to setup schema");
 
     let graph_conn = Arc::new(TokioMutex::new(conn));
@@ -66,6 +67,7 @@ pub fn run() {
             graph_conn,
             orchestrator: Arc::new(TokioMutex::new(orchestrator)),
             workspace_root: Mutex::new(None),
+            cancel_flags: Arc::new(TokioMutex::new(std::collections::HashMap::new())),
         })
         .setup(|app| {
             let app_handle_idle = app.handle().clone();
@@ -96,9 +98,11 @@ pub fn run() {
             commands::fs_commands::delete_file,
             commands::model_commands::send_chat_message,
             commands::model_commands::preload_model,
+            commands::model_commands::cancel_chat_message,
             commands::graph_commands::rebuild_index,
             commands::graph_commands::get_index_stats,
             commands::graph_commands::search_mentions,
+            commands::graph_commands::get_full_graph,
             commands::git_commands::get_repo_status,
             commands::git_commands::has_uncommitted_changes,
             commands::git_commands::get_file_diff,

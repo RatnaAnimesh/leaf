@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { FileNode, WorkspaceConfig, ChatMessage, RepoStatus, ChatSession, MentionResult } from './types';
+import { FileNode, WorkspaceConfig, ChatMessage, RepoStatus, ChatSession, MentionResult, GraphData } from './types';
 
 export interface ReadDirectoryResult {
   nodes: FileNode[];
@@ -64,6 +64,10 @@ export async function sendChatMessage(
   });
 }
 
+export async function cancelChatMessage(streamId: string): Promise<void> {
+  return invoke('cancel_chat_message', { streamId });
+}
+
 export async function preloadModel(role: 'coder' | 'reasoning'): Promise<void> {
   return invoke('preload_model', { role });
 }
@@ -100,16 +104,16 @@ export async function commit(workspaceRoot: string, message: string): Promise<vo
   return invoke('commit', { workspaceRoot, message });
 }
 
-export async function listSessions(): Promise<ChatSession[]> {
-  return invoke('list_sessions');
+export async function listSessions(workspaceRoot: string): Promise<ChatSession[]> {
+  return invoke('list_sessions', { workspaceRoot });
 }
 
 export async function getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
   return invoke('get_session_messages', { sessionId });
 }
 
-export async function createSession(id: string, title: string): Promise<ChatSession> {
-  return invoke('create_session', { id, title });
+export async function createSession(id: string, title: string, workspaceRoot: string): Promise<ChatSession> {
+  return invoke('create_session', { id, title, workspaceRoot });
 }
 
 export async function addMessage(sessionId: string, role: string, content: string): Promise<number> {
@@ -134,4 +138,12 @@ export async function getRecentWorkspaces(): Promise<string[]> {
 
 export async function addRecentWorkspace(path: string): Promise<void> {
   return invoke('add_recent_workspace', { path });
+}
+
+export async function getFullGraph(workspaceRoot: string): Promise<GraphData> {
+  return invoke('get_full_graph', { workspaceRoot });
+}
+
+export async function rebuildIndex(path: string): Promise<void> {
+  return invoke('rebuild_index', { path });
 }
