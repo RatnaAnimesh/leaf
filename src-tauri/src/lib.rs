@@ -59,6 +59,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_pty::init())
         .manage(AppState {
             watcher: Mutex::new(None),
@@ -89,6 +90,10 @@ pub fn run() {
             commands::fs_commands::read_directory,
             commands::fs_commands::read_file,
             commands::fs_commands::write_file,
+            commands::fs_commands::create_file,
+            commands::fs_commands::create_dir,
+            commands::fs_commands::rename_file,
+            commands::fs_commands::delete_file,
             commands::model_commands::send_chat_message,
             commands::model_commands::preload_model,
             commands::graph_commands::rebuild_index,
@@ -101,6 +106,9 @@ pub fn run() {
             commands::git_commands::stage_file,
             commands::git_commands::unstage_file,
             commands::git_commands::commit,
+            commands::git_commands::git_clone,
+            commands::workspace_commands::get_recent_workspaces,
+            commands::workspace_commands::add_recent_workspace,
             commands::session_commands::list_sessions,
             commands::session_commands::get_session_messages,
             commands::session_commands::create_session,

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { RepoStatus, GitFile } from '../../lib/types';
 import { getRepoStatus, stageFile, unstageFile, commit, getFileHeadContent, readFile } from '../../lib/tauri-commands';
+import { GitBranch, Plus, Minus } from 'lucide-react';
 
 interface SourceControlPanelProps {
     workspaceRoot: string;
@@ -71,7 +72,7 @@ export function SourceControlPanel({ workspaceRoot, onFileSelect }: SourceContro
         return <div style={{ padding: '8px' }}>Loading Git status...</div>;
     }
 
-    const renderFileList = (title: string, files: GitFile[], onAction: (f: GitFile) => void, actionIcon: string) => {
+    const renderFileList = (title: string, files: GitFile[], onAction: (f: GitFile) => void, actionIcon: React.ReactNode, actionTitle: string) => {
         if (files.length === 0) return null;
         return (
             <div style={{ marginBottom: '12px' }}>
@@ -104,8 +105,8 @@ export function SourceControlPanel({ workspaceRoot, onFileSelect }: SourceContro
                             </div>
                             <button 
                                 onClick={(e) => { e.stopPropagation(); onAction(f); }}
-                                style={{ background: 'transparent', border: 'none', color: '#ccc', cursor: 'pointer' }}
-                                title={actionIcon === '+' ? 'Stage Changes' : 'Unstage Changes'}
+                                style={{ background: 'transparent', border: 'none', color: '#ccc', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                title={actionTitle}
                             >
                                 {actionIcon}
                             </button>
@@ -120,8 +121,8 @@ export function SourceControlPanel({ workspaceRoot, onFileSelect }: SourceContro
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', color: '#ccc', background: '#252526' }}>
             <div style={{ padding: '8px', borderBottom: '1px solid #333' }}>
                 <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>SOURCE CONTROL</div>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
-                    ⎇ {status.branch} {status.ahead > 0 && `↑${status.ahead}`} {status.behind > 0 && `↓${status.behind}`}
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <GitBranch size={12} /> {status.branch} {status.ahead > 0 && `↑${status.ahead}`} {status.behind > 0 && `↓${status.behind}`}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <textarea 
@@ -162,9 +163,9 @@ export function SourceControlPanel({ workspaceRoot, onFileSelect }: SourceContro
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto' }}>
-                {renderFileList('Staged Changes', status.staged, handleUnstage, '-')}
-                {renderFileList('Changes', status.unstaged, handleStage, '+')}
-                {renderFileList('Untracked', status.untracked, handleStage, '+')}
+                {renderFileList('Staged Changes', status.staged, handleUnstage, <Minus size={14} />, 'Unstage Changes')}
+                {renderFileList('Changes', status.unstaged, handleStage, <Plus size={14} />, 'Stage Changes')}
+                {renderFileList('Untracked', status.untracked, handleStage, <Plus size={14} />, 'Stage Changes')}
             </div>
         </div>
     );

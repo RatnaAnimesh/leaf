@@ -62,6 +62,7 @@ export function CodeEditor({ filePath, content, onChange, language, onViewStateC
           readOnly: true,
           renderSideBySide: true,
         }}
+        theme="vs-dark"
       />
     );
   }
@@ -80,6 +81,7 @@ export function CodeEditor({ filePath, content, onChange, language, onViewStateC
         scrollBeyondLastLine: false,
         automaticLayout: true,
       }}
+      theme="vs-dark"
     />
   );
 }

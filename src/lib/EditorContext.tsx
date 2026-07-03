@@ -64,6 +64,14 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 
   const closeFile = (path: string) => {
     setState((prev) => {
+      const tab = prev.openTabs.find((t) => t.path === path);
+      if (tab && tab.content !== tab.savedContent) {
+        const discard = window.confirm(`You have unsaved changes in ${path.split('/').pop()}. Discard them?`);
+        if (!discard) {
+          return prev;
+        }
+      }
+      
       const newTabs = prev.openTabs.filter((t) => t.path !== path);
       let newActive = prev.activeTabPath;
       if (newActive === path) {

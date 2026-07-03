@@ -18,6 +18,22 @@ export async function writeFile(path: string, content: string): Promise<void> {
   return invoke('write_file', { path, content });
 }
 
+export async function createFile(path: string): Promise<void> {
+  return invoke('create_file', { path });
+}
+
+export async function createDir(path: string): Promise<void> {
+  return invoke('create_dir', { path });
+}
+
+export async function renameFile(oldPath: string, newPath: string): Promise<void> {
+  return invoke('rename_file', { oldPath, newPath });
+}
+
+export async function deleteFile(path: string): Promise<void> {
+  return invoke('delete_file', { path });
+}
+
 export async function loadWorkspaceConfig(workspaceRoot: string): Promise<WorkspaceConfig> {
   return invoke('load_workspace_config', { workspaceRoot });
 }
@@ -106,4 +122,16 @@ export async function updateSessionSummary(sessionId: string, summary: string): 
 
 export async function searchMentions(query: string): Promise<MentionResult[]> {
   return invoke('search_mentions', { query });
+}
+
+export async function gitClone(url: string, parentDir: string): Promise<string> {
+  return invoke('git_clone', { url, parentDir });
+}
+
+export async function getRecentWorkspaces(): Promise<string[]> {
+  return invoke('get_recent_workspaces');
+}
+
+export async function addRecentWorkspace(path: string): Promise<void> {
+  return invoke('add_recent_workspace', { path });
 }

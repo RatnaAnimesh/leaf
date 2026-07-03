@@ -5,21 +5,27 @@ import { SourceControlPanel } from './components/FileExplorer/SourceControlPanel
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
 import { CodeEditor } from './components/Editor/CodeEditor';
 import { TerminalDrawer } from './components/TerminalDrawer/TerminalDrawer';
+import { Folder, GitBranch, X, Circle } from 'lucide-react';
 import { EditorProvider, useEditor } from './lib/EditorContext';
-import { loadWorkspaceConfig, saveWorkspaceConfig, readFile, writeFile, startWatchingWorkspace } from './lib/tauri-commands';
+import { loadWorkspaceConfig, saveWorkspaceConfig, readFile, writeFile, startWatchingWorkspace, addRecentWorkspace } from './lib/tauri-commands';
 import { WorkspaceConfig } from './lib/types';
+import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen';
 
-function LeafIDE() {
+interface LeafIDEProps {
+  workspaceRoot: string;
+}
+
+function LeafIDE({ workspaceRoot }: LeafIDEProps) {
   const [config, setConfig] = useState<WorkspaceConfig | null>(null);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [leftTab, setLeftTab] = useState<'explorer' | 'git'>('explorer');
-  const workspaceRoot = '.'; // Default for Phase 1
   const { state, openFile, closeFile, updateTabContent, updateTabSavedContent, updateTabViewState, setActiveTab } = useEditor();
 
   useEffect(() => {
     loadWorkspaceConfig(workspaceRoot).then(setConfig);
     startWatchingWorkspace(workspaceRoot).catch(console.error);
+    addRecentWorkspace(workspaceRoot).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -97,23 +103,44 @@ function LeafIDE() {
 
   const activeTab = state.openTabs.find(t => t.path === state.activeTabPath);
 
+  // Soothing Dark Theme Colors
+  const colors = {
+    bgDark: '#1e1e1e', // Base background
+    bgPanel: '#252526', // Panel background
+    border: '#333333',
+    textPrimary: '#cccccc',
+    textSecondary: '#888888',
+    highlight: '#2a2d2e',
+    accent: '#3794ff',
+  };
+
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column' }}>
-      <PanelGroup direction="horizontal" onLayout={(sizes) => handleLayoutChange(sizes, 'main')}>
-        <Panel defaultSize={config.mainSplit[0]} minSize={20} maxSize={50}>
+    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'row', backgroundColor: colors.bgDark, color: colors.textPrimary, overflow: 'hidden' }}>
+      
+      {/* Activity Bar */}
+      <div style={{ width: '48px', minWidth: '48px', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${colors.border}`, backgroundColor: colors.bgDark, alignItems: 'center', paddingTop: '12px', gap: '8px' }}>
+        <button 
+          style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: leftTab === 'explorer' ? colors.textPrimary : colors.textSecondary, border: 'none', cursor: 'pointer', borderLeft: leftTab === 'explorer' ? `2px solid ${colors.accent}` : '2px solid transparent', transition: 'color 0.2s ease' }}
+          title="Explorer"
+          onClick={() => setLeftTab('explorer')}
+        >
+          <Folder size={24} strokeWidth={1.5} />
+        </button>
+        <button 
+          style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: leftTab === 'git' ? colors.textPrimary : colors.textSecondary, border: 'none', cursor: 'pointer', borderLeft: leftTab === 'git' ? `2px solid ${colors.accent}` : '2px solid transparent', transition: 'color 0.2s ease' }}
+          title="Source Control"
+          onClick={() => setLeftTab('git')}
+        >
+          <GitBranch size={24} strokeWidth={1.5} />
+        </button>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <PanelGroup direction="horizontal" onLayout={(sizes) => handleLayoutChange(sizes, 'main')}>
+        <Panel defaultSize={config.mainSplit[0] || 50} minSize={20} maxSize={70}>
           <PanelGroup direction="vertical" onLayout={(sizes) => handleLayoutChange(sizes, 'left')}>
-            <Panel defaultSize={config.leftSplit[0]} minSize={20}>
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', borderBottom: '1px solid #ccc', background: '#f5f5f5' }}>
-                  <button 
-                    style={{ flex: 1, padding: '4px', background: leftTab === 'explorer' ? '#fff' : 'transparent', border: 'none', borderRight: '1px solid #ccc', cursor: 'pointer' }}
-                    onClick={() => setLeftTab('explorer')}
-                  >Explorer</button>
-                  <button 
-                    style={{ flex: 1, padding: '4px', background: leftTab === 'git' ? '#fff' : 'transparent', border: 'none', cursor: 'pointer' }}
-                    onClick={() => setLeftTab('git')}
-                  >Source Control</button>
-                </div>
+            <Panel defaultSize={config.leftSplit[0] || 50} minSize={20}>
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: colors.bgPanel }}>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   {leftTab === 'explorer' && (
                     <FileExplorer workspaceRoot={workspaceRoot} onFileSelect={async (p) => {
@@ -137,9 +164,9 @@ function LeafIDE() {
                 </div>
               </div>
             </Panel>
-            <PanelResizeHandle style={{ height: '4px', background: '#ccc', cursor: 'row-resize' }} />
+            <PanelResizeHandle style={{ height: '2px', background: colors.border, cursor: 'row-resize' }} />
             <Panel 
-              defaultSize={chatCollapsed ? 0 : config.leftSplit[1]} 
+              defaultSize={chatCollapsed ? 0 : (config.leftSplit[1] || 50)} 
               minSize={15} 
               collapsible={true}
             >
@@ -148,29 +175,32 @@ function LeafIDE() {
           </PanelGroup>
         </Panel>
         
-        <PanelResizeHandle style={{ width: '4px', background: '#ccc', cursor: 'col-resize' }} />
+        <PanelResizeHandle style={{ width: '2px', background: colors.border, cursor: 'col-resize' }} />
         
-        <Panel defaultSize={config.mainSplit[1]} minSize={40}>
+        <Panel defaultSize={config.mainSplit[1] || 50} minSize={30}>
           <PanelGroup direction="vertical">
             <Panel defaultSize={terminalOpen ? 70 : 100}>
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', borderBottom: '1px solid #ccc', background: '#f5f5f5' }}>
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: colors.bgDark }}>
+                <div style={{ display: 'flex', borderBottom: `1px solid ${colors.border}`, background: colors.bgDark }}>
                   {state.openTabs.map(tab => (
                     <div 
                       key={tab.path} 
                       style={{ 
                         padding: '8px 16px', 
                         cursor: 'pointer', 
-                        background: tab.path === state.activeTabPath ? '#fff' : 'transparent',
-                        borderRight: '1px solid #ccc',
+                        background: tab.path === state.activeTabPath ? colors.bgPanel : 'transparent',
+                        color: tab.path === state.activeTabPath ? colors.textPrimary : colors.textSecondary,
+                        borderRight: `1px solid ${colors.border}`,
                         display: 'flex',
                         alignItems: 'center'
                       }}
                       onClick={() => setActiveTab(tab.path)}
                     >
                       {tab.path.split('/').pop()}
-                      {tab.content !== tab.savedContent && <span style={{ marginLeft: 4, width: 8, height: 8, borderRadius: '50%', background: 'black' }} />}
-                      <button onClick={(e) => { e.stopPropagation(); closeFile(tab.path); }} style={{ marginLeft: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>x</button>
+                      {tab.content !== tab.savedContent && <Circle size={8} fill={colors.accent} color={colors.accent} style={{ marginLeft: 8 }} />}
+                      <button onClick={(e) => { e.stopPropagation(); closeFile(tab.path); }} style={{ marginLeft: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: colors.textSecondary, cursor: 'pointer', padding: 2, borderRadius: 4 }}>
+                        <X size={16} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -197,7 +227,7 @@ function LeafIDE() {
             
             {terminalOpen && (
               <>
-                <PanelResizeHandle style={{ height: '4px', background: '#ccc', cursor: 'row-resize' }} />
+                <PanelResizeHandle style={{ height: '2px', background: colors.border, cursor: 'row-resize' }} />
                 <Panel defaultSize={30} minSize={10}>
                   <TerminalDrawer 
                     onClose={() => setTerminalOpen(false)}
@@ -213,14 +243,21 @@ function LeafIDE() {
           </PanelGroup>
         </Panel>
       </PanelGroup>
+      </div>
     </div>
   );
 }
 
 export default function App() {
+  const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null);
+
+  if (!workspaceRoot) {
+    return <WelcomeScreen onOpenFolder={setWorkspaceRoot} />;
+  }
+
   return (
     <EditorProvider>
-      <LeafIDE />
+      <LeafIDE workspaceRoot={workspaceRoot} />
     </EditorProvider>
   );
 }

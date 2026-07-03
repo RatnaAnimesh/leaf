@@ -100,3 +100,31 @@ pub async fn write_file(path: String, content: String, state: State<'_, AppState
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn create_file(path: String) -> Result<(), String> {
+    if std::path::Path::new(&path).exists() {
+        return Err(format!("File {} already exists", path));
+    }
+    fs::write(&path, "").map_err(|e| format!("Failed to create file {}: {}", path, e))
+}
+
+#[tauri::command]
+pub async fn create_dir(path: String) -> Result<(), String> {
+    fs::create_dir_all(&path).map_err(|e| format!("Failed to create directory {}: {}", path, e))
+}
+
+#[tauri::command]
+pub async fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
+    fs::rename(&old_path, &new_path).map_err(|e| format!("Failed to rename {} to {}: {}", old_path, new_path, e))
+}
+
+#[tauri::command]
+pub async fn delete_file(path: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    if p.is_dir() {
+        fs::remove_dir_all(p).map_err(|e| format!("Failed to delete directory {}: {}", path, e))
+    } else {
+        fs::remove_file(p).map_err(|e| format!("Failed to delete file {}: {}", path, e))
+    }
+}
