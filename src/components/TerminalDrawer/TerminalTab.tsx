@@ -43,12 +43,12 @@ export const TerminalTab = React.forwardRef<{ getOutput: () => string }, Termina
         if (!containerRef.current) return;
 
         const term = new Terminal({
-            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+            fontFamily: "'JetBrains Mono', monospace",
             fontSize: 12,
             cursorBlink: true,
             theme: {
-                background: '#1e1e1e',
-                foreground: '#cccccc'
+                background: 'var(--color-base)',
+                foreground: 'var(--color-text-primary)'
             }
         });
 

@@ -1925,6 +1925,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "content_inspector",
+ "dirs",
  "futures-util",
  "git2",
  "ignore",

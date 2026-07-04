@@ -129,6 +129,8 @@ pub struct GraphNode {
     pub label: String,
     pub group: String,
     pub kind: Option<String>,
+    pub path: Option<String>,
+    pub line: Option<u32>,
 }
 
 #[derive(serde::Serialize)]
@@ -164,23 +166,34 @@ pub async fn get_full_graph(workspace_root: String, state: State<'_, AppState>) 
             label: basename,
             group: "file".to_string(),
             kind: None,
+            path: Some(path.clone()),
+            line: Some(1),
         });
     }
 
     // 2. Fetch Symbols
-    let mut stmt = conn.prepare("SELECT id, file_id, name, kind FROM symbols WHERE file_id IN (SELECT id FROM files WHERE path LIKE ?1)").map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare("
+        SELECT s.id, s.file_id, s.name, s.kind, s.start_line, f.path 
+        FROM symbols s
+        JOIN files f ON s.file_id = f.id
+        WHERE f.path LIKE ?1
+    ").map_err(|e| e.to_string())?;
     let mut sym_rows = stmt.query([&pattern]).map_err(|e| e.to_string())?;
     while let Ok(Some(row)) = sym_rows.next() {
         let id: i64 = row.get(0).unwrap_or(0);
         let file_id: i64 = row.get(1).unwrap_or(0);
         let name: String = row.get(2).unwrap_or_default();
         let kind: String = row.get(3).unwrap_or_default();
+        let start_line: u32 = row.get(4).unwrap_or(1);
+        let path: String = row.get(5).unwrap_or_default();
         
         nodes.push(GraphNode {
             id: format!("sym_{}", id),
             label: name,
             group: "symbol".to_string(),
             kind: Some(kind),
+            path: Some(path),
+            line: Some(start_line),
         });
 
         // Implicit edge from file to symbol

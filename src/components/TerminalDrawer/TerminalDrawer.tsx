@@ -52,9 +52,9 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({ onSendToChat, on
     if (tabs.length === 0) return null;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#1e1e1e', borderTop: '1px solid #333' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-base)', borderTop: '1px solid #333' }}>
             {/* Tab Bar */}
-            <div style={{ display: 'flex', background: '#252526', color: '#ccc', fontSize: 12, alignItems: 'center' }}>
+            <div style={{ display: 'flex', background: 'var(--color-surface)', color: '#ccc', fontSize: 12, alignItems: 'center' }}>
                 <div style={{ display: 'flex', flex: 1, overflowX: 'auto' }}>
                     {tabs.map((tab) => (
                         <div
@@ -63,7 +63,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({ onSendToChat, on
                             style={{
                                 padding: '6px 12px',
                                 cursor: 'pointer',
-                                background: activeTabId === tab.id ? '#1e1e1e' : 'transparent',
+                                background: activeTabId === tab.id ? 'var(--color-base)' : 'transparent',
                                 borderRight: '1px solid #333',
                                 display: 'flex',
                                 alignItems: 'center',

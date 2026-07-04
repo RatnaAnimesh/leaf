@@ -47,7 +47,7 @@ export function DiffReviewPanel({ path, newContent, onApprove, onReject }: DiffR
       <div style={{ backgroundColor: '#f3f3f3', padding: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ccc' }}>
         <strong style={{ fontSize: '0.9em' }}>{path}</strong>
         <div>
-          <button onClick={handleApprove} style={{ marginRight: '8px', backgroundColor: '#4CAF50', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>Approve</button>
+          <button onClick={handleApprove} style={{ marginRight: '8px', backgroundColor: 'var(--color-accent)', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>Approve</button>
           <button onClick={onReject} style={{ backgroundColor: '#f44336', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>Reject</button>
         </div>
       </div>

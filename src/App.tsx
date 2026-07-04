@@ -107,60 +107,77 @@ function LeafIDE({ workspaceRoot, onSwitchProject }: LeafIDEProps) {
 
   const activeTab = state.openTabs.find(t => t.path === state.activeTabPath);
 
-  // Soothing Dark Theme Colors
-  const colors = {
-    bgDark: '#1e1e1e', // Base background
-    bgPanel: '#252526', // Panel background
-    border: '#333333',
-    textPrimary: '#cccccc',
-    textSecondary: '#888888',
-    highlight: '#2a2d2e',
-    accent: '#3794ff',
-  };
-
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'row', backgroundColor: colors.bgDark, color: colors.textPrimary, overflow: 'hidden' }}>
+    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'row', backgroundColor: 'var(--color-base)', color: 'var(--color-text-primary)', overflow: 'hidden', padding: 'var(--panel-gap)' }}>
       
       {/* Activity Bar */}
-      <div style={{ width: '48px', minWidth: '48px', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${colors.border}`, backgroundColor: colors.bgDark, alignItems: 'center', paddingTop: '12px', gap: '8px' }}>
+      <div className="panel-container" style={{ width: '48px', minWidth: '48px', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '12px', gap: '8px', marginRight: 'var(--panel-gap)' }}>
         <button 
-          style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: leftTab === 'explorer' ? colors.textPrimary : colors.textSecondary, border: 'none', cursor: 'pointer', borderLeft: leftTab === 'explorer' ? `2px solid ${colors.accent}` : '2px solid transparent', transition: 'color 0.2s ease' }}
+          className={`icon-button ${leftTab === 'explorer' ? 'active' : ''}`}
+          style={{ width: '36px', height: '36px', background: 'transparent', border: 'none', cursor: 'pointer' }}
           title="Explorer"
           onClick={() => setLeftTab('explorer')}
         >
-          <Folder size={24} strokeWidth={1.5} />
+          <Folder size={20} strokeWidth={1.5} />
         </button>
         <button 
-          style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: leftTab === 'git' ? colors.textPrimary : colors.textSecondary, border: 'none', cursor: 'pointer', borderLeft: leftTab === 'git' ? `2px solid ${colors.accent}` : '2px solid transparent', transition: 'color 0.2s ease' }}
+          className={`icon-button ${leftTab === 'git' ? 'active' : ''}`}
+          style={{ width: '36px', height: '36px', background: 'transparent', border: 'none', cursor: 'pointer' }}
           title="Source Control"
           onClick={() => setLeftTab('git')}
         >
-          <GitBranch size={24} strokeWidth={1.5} />
+          <GitBranch size={20} strokeWidth={1.5} />
         </button>
         <button 
-          style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: showGraph ? colors.textPrimary : colors.textSecondary, border: 'none', cursor: 'pointer', borderLeft: showGraph ? `2px solid ${colors.accent}` : '2px solid transparent', transition: 'color 0.2s ease' }}
+          className={`icon-button ${showGraph ? 'active' : ''}`}
+          style={{ width: '36px', height: '36px', background: 'transparent', border: 'none', cursor: 'pointer' }}
           title="Knowledge Graph"
           onClick={() => setShowGraph(true)}
         >
-          <Network size={24} strokeWidth={1.5} />
+          <Network size={20} strokeWidth={1.5} />
         </button>
         <div style={{ flex: 1 }}></div>
         <button 
-          style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: '#888', border: 'none', cursor: 'pointer' }}
+          className="icon-button"
+          style={{ width: '36px', height: '36px', background: 'transparent', border: 'none', cursor: 'pointer', marginBottom: '12px' }}
           title="Switch Project"
           onClick={onSwitchProject}
         >
-          <Home size={24} strokeWidth={1.5} />
+          <Home size={20} strokeWidth={1.5} />
         </button>
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {showGraph && <GraphViewer workspaceRoot={workspaceRoot} onClose={() => setShowGraph(false)} />}
+        {showGraph && <GraphViewer 
+          workspaceRoot={workspaceRoot} 
+          onClose={() => setShowGraph(false)} 
+          onNodeClick={async (node) => {
+            if (node.path) {
+              if (!state.openTabs.find(t => t.path === node.path && !t.isDiff)) {
+                try {
+                  const content = await readFile(node.path);
+                  openFile(node.path, content, false, undefined, node.line || 1);
+                } catch (e) {
+                  console.error("Read err", e);
+                }
+              } else {
+                setActiveTab(node.path);
+                // Also need a way to jump to line if tab is already open.
+                // Our openFile logic handles updating cursor if we call it again.
+                // But wait, openFile needs content. If it's already open, we don't want to re-read.
+                // Let's just use openFile with empty content, it won't overwrite existing if it finds it, 
+                // because EditorContext openFile only updates cursor position if it already exists!
+                openFile(node.path, "", false, undefined, node.line || 1);
+              }
+              setShowGraph(false);
+            }
+          }}
+        />}
         <PanelGroup direction="horizontal" onLayout={(sizes) => handleLayoutChange(sizes, 'main')}>
         <Panel defaultSize={config.mainSplit[0] || 50} minSize={20} maxSize={70}>
           <PanelGroup direction="vertical" onLayout={(sizes) => handleLayoutChange(sizes, 'left')}>
             <Panel defaultSize={config.leftSplit[0] || 50} minSize={20}>
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: colors.bgPanel }}>
+              <div className={`panel-container ${leftTab === 'explorer' || leftTab === 'git' ? 'active-panel' : ''}`} style={{ height: '100%', overflow: 'hidden' }}>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   {leftTab === 'explorer' && (
                     <FileExplorer workspaceRoot={workspaceRoot} onFileSelect={async (p) => {
@@ -184,47 +201,53 @@ function LeafIDE({ workspaceRoot, onSwitchProject }: LeafIDEProps) {
                 </div>
               </div>
             </Panel>
-            <PanelResizeHandle style={{ height: '2px', background: colors.border, cursor: 'row-resize' }} />
+            <PanelResizeHandle style={{ height: '1px', cursor: 'row-resize', background: 'var(--color-border)' }} />
             <Panel 
               defaultSize={chatCollapsed ? 0 : (config.leftSplit[1] || 50)} 
               minSize={15} 
               collapsible={true}
             >
-              {!chatCollapsed && <ChatPanel workspaceRoot={workspaceRoot} activeFilePath={activeTab?.path} activeLineNumber={activeTab?.cursorPosition?.lineNumber} />}
+              {!chatCollapsed && (
+                <div className="panel-container" style={{ height: '100%', overflow: 'hidden' }}>
+                  <ChatPanel workspaceRoot={workspaceRoot} activeFilePath={activeTab?.path} activeLineNumber={activeTab?.cursorPosition?.lineNumber} />
+                </div>
+              )}
             </Panel>
           </PanelGroup>
         </Panel>
         
-        <PanelResizeHandle style={{ width: '2px', background: colors.border, cursor: 'col-resize' }} />
+        <PanelResizeHandle style={{ width: '1px', cursor: 'col-resize', background: 'var(--color-border)' }} />
         
         <Panel defaultSize={config.mainSplit[1] || 50} minSize={30}>
           <PanelGroup direction="vertical">
             <Panel defaultSize={terminalOpen ? 70 : 100}>
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: colors.bgDark }}>
-                <div style={{ display: 'flex', borderBottom: `1px solid ${colors.border}`, background: colors.bgDark }}>
+              <div className="panel-container active-panel" style={{ height: '100%' }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
                   {state.openTabs.map(tab => (
                     <div 
                       key={tab.path} 
                       style={{ 
                         padding: '8px 16px', 
                         cursor: 'pointer', 
-                        background: tab.path === state.activeTabPath ? colors.bgPanel : 'transparent',
-                        color: tab.path === state.activeTabPath ? colors.textPrimary : colors.textSecondary,
-                        borderRight: `1px solid ${colors.border}`,
+                        background: tab.path === state.activeTabPath ? 'var(--color-accent-subtle)' : 'transparent',
+                        color: tab.path === state.activeTabPath ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                        borderRight: '1px solid var(--color-border)',
+                        borderBottom: tab.path === state.activeTabPath ? '1px solid var(--color-accent)' : '1px solid transparent',
                         display: 'flex',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        fontSize: '13px'
                       }}
                       onClick={() => setActiveTab(tab.path)}
                     >
                       {tab.path.split('/').pop()}
-                      {tab.content !== tab.savedContent && <Circle size={8} fill={colors.accent} color={colors.accent} style={{ marginLeft: 8 }} />}
-                      <button onClick={(e) => { e.stopPropagation(); closeFile(tab.path); }} style={{ marginLeft: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: colors.textSecondary, cursor: 'pointer', padding: 2, borderRadius: 4 }}>
-                        <X size={16} />
+                      {tab.content !== tab.savedContent && <Circle size={8} fill="var(--color-accent)" color="var(--color-accent)" style={{ marginLeft: 8 }} />}
+                      <button onClick={(e) => { e.stopPropagation(); closeFile(tab.path); }} style={{ marginLeft: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: 2, borderRadius: 4 }}>
+                        <X size={14} />
                       </button>
                     </div>
                   ))}
                 </div>
-                <div style={{ flex: 1, overflow: 'hidden' }}>
+                <div style={{ flex: 1, overflow: 'hidden', background: 'var(--color-base)' }}>
                   {activeTab ? (
                     <CodeEditor
                       filePath={activeTab.path}
@@ -237,7 +260,7 @@ function LeafIDE({ workspaceRoot, onSwitchProject }: LeafIDEProps) {
                       originalContent={activeTab.originalContent}
                     />
                   ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-secondary)' }}>
                       No file open
                     </div>
                   )}
@@ -247,16 +270,16 @@ function LeafIDE({ workspaceRoot, onSwitchProject }: LeafIDEProps) {
             
             {terminalOpen && (
               <>
-                <PanelResizeHandle style={{ height: '2px', background: colors.border, cursor: 'row-resize' }} />
+                <PanelResizeHandle style={{ height: '1px', cursor: 'row-resize', background: 'var(--color-border)' }} />
                 <Panel defaultSize={30} minSize={10}>
-                  <TerminalDrawer 
-                    onClose={() => setTerminalOpen(false)}
-                    onSendToChat={(text) => {
-                      // Note: We need a way to send this text to the chat panel.
-                      // For now, we will dispatch a custom event that ChatPanel can listen to.
-                      window.dispatchEvent(new CustomEvent('send-to-chat', { detail: text }));
-                    }}
-                  />
+                  <div className="panel-container" style={{ height: '100%', overflow: 'hidden' }}>
+                    <TerminalDrawer 
+                      onClose={() => setTerminalOpen(false)}
+                      onSendToChat={(text) => {
+                        window.dispatchEvent(new CustomEvent('send-to-chat', { detail: text }));
+                      }}
+                    />
+                  </div>
                 </Panel>
               </>
             )}

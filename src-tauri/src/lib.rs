@@ -24,9 +24,9 @@ fn start_watching_workspace(path: String, app_handle: tauri::AppHandle, state: t
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let leaf_dir = std::path::Path::new(".leaf");
+    let leaf_dir = dirs::home_dir().expect("failed to get home directory").join(".leaf");
     if !leaf_dir.exists() {
-        std::fs::create_dir_all(leaf_dir).expect("failed to create .leaf directory");
+        std::fs::create_dir_all(&leaf_dir).expect("failed to create .leaf directory");
     }
     let db_path = leaf_dir.join("graph.db");
     let conn = rusqlite::Connection::open(&db_path).expect("failed to open graph.db");
@@ -62,6 +62,7 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_pty::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState {
             watcher: Mutex::new(None),
             graph_conn,

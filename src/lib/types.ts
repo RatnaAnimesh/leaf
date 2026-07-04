@@ -81,6 +81,8 @@ export interface GraphNode {
   label: string;
   group: string;
   kind: string | null;
+  path: string | null;
+  line: number | null;
 }
 
 export interface GraphLink {

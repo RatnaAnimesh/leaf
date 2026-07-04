@@ -6,8 +6,10 @@ interface WelcomeScreenProps {
   onOpenFolder: (path: string) => void;
 }
 
+let splashShown = sessionStorage.getItem('leaf_splash_shown') === 'true';
+
 export function WelcomeScreen({ onOpenFolder }: WelcomeScreenProps) {
-  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashVisible, setSplashVisible] = useState(!splashShown);
   const [animating, setAnimating] = useState(false);
   const [fadeSplash, setFadeSplash] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
@@ -18,6 +20,9 @@ export function WelcomeScreen({ onOpenFolder }: WelcomeScreenProps) {
 
   useEffect(() => {
     getRecentWorkspaces().then(setRecentWorkspaces).catch(console.error);
+    
+    if (splashShown) return;
+
     // Start animation: text fades out, dot expands
     const t1 = setTimeout(() => {
       setAnimating(true);
@@ -31,6 +36,8 @@ export function WelcomeScreen({ onOpenFolder }: WelcomeScreenProps) {
     // Remove splash overlay from DOM
     const t3 = setTimeout(() => {
       setSplashVisible(false);
+      splashShown = true;
+      sessionStorage.setItem('leaf_splash_shown', 'true');
     }, 2500);
 
     return () => {
@@ -288,13 +295,15 @@ export function WelcomeScreen({ onOpenFolder }: WelcomeScreenProps) {
               fontSize: '8rem', 
               color: '#ffffff',
               opacity: animating ? 0 : 1,
-              transition: 'opacity 0.4s ease-in-out'
+              transition: 'opacity 0.4s ease-in-out',
+              position: 'relative',
+              zIndex: 10
             }}>leaf</span>
             <div style={{ 
               display: 'inline-block',
               width: '1.2rem',
               height: '1.2rem',
-              backgroundColor: '#4caf50',
+              backgroundColor: 'var(--color-accent)',
               borderRadius: '50%',
               marginLeft: '0.2rem',
               transformOrigin: 'center center',

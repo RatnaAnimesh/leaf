@@ -92,7 +92,7 @@ export function SourceControlPanel({ workspaceRoot, onFileSelect }: SourceContro
                                 fontSize: '12px'
                             }}
                             onClick={() => handleFileClick(f)}
-                            onMouseEnter={e => e.currentTarget.style.background = '#2a2d2e'}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--color-accent-subtle)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
@@ -118,10 +118,10 @@ export function SourceControlPanel({ workspaceRoot, onFileSelect }: SourceContro
     };
 
     return (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', color: '#ccc', background: '#252526' }}>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', color: '#ccc', background: 'var(--color-surface)' }}>
             <div style={{ padding: '8px', borderBottom: '1px solid #333' }}>
                 <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>SOURCE CONTROL</div>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <GitBranch size={12} /> {status.branch} {status.ahead > 0 && `↑${status.ahead}`} {status.behind > 0 && `↓${status.behind}`}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

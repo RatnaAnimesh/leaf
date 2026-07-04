@@ -1,10 +1,27 @@
+:root {
+  /* Greenhouse Palette */
+  --color-base: #111513;
+  --color-surface: #161C1A;
+  --color-border: rgba(255, 255, 255, 0.05); /* Hairline precision */
+  --color-text-primary: #E4E8E5;
+  --color-text-secondary: #8B9992;
+  --color-accent: #7C9E8B;
+  --color-accent-transparent: rgba(124, 158, 139, 0.15);
+  --color-accent-subtle: rgba(124, 158, 139, 0.05);
+  
+  --panel-radius: 0px; /* Monolithic layout */
+  --panel-gap: 0px;
+}
+
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-base);
+  color: var(--color-text-primary);
 }
 
 * {
@@ -16,12 +33,20 @@ input, button, select, textarea {
   outline: none;
 }
 
-:focus-visible {
-  outline: 2px solid rgba(88, 166, 255, 0.4);
-  outline-offset: -1px;
+/* Monospace restricted classes */
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
 }
 
-/* Custom Webkit Scrollbar for Dark Theme */
+/* Custom Signature Focus Glow */
+:focus-visible {
+  outline: 1px solid var(--color-accent);
+  box-shadow: inset 0 0 8px var(--color-accent-subtle);
+  outline-offset: -1px;
+  border-radius: 2px;
+}
+
+/* Custom Scrollbar for Greenhouse */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -32,14 +57,14 @@ input, button, select, textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(139, 153, 146, 0.15);
   border-radius: 5px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(139, 153, 146, 0.3);
   border-radius: 5px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -47,4 +72,41 @@ input, button, select, textarea {
 
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Global Utility Classes */
+.panel-container {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--panel-radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.2s ease;
+}
+
+/* The signature frosted background element for active states */
+.panel-container.active-panel {
+  background-color: #1A211E;
+}
+
+.icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: all 0.15s ease;
+}
+
+.icon-button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-primary);
+}
+
+.icon-button.active {
+  color: var(--color-text-primary);
+  background-color: rgba(255, 255, 255, 0.08);
 }

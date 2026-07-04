@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import Editor, { DiffEditor } from '@monaco-editor/react';
+import { useRef, useEffect } from 'react';
+import Editor, { DiffEditor, useMonaco } from '@monaco-editor/react';
 
 interface CodeEditorProps {
   filePath: string;
@@ -17,6 +17,29 @@ interface CodeEditorProps {
 
 export function CodeEditor({ filePath, content, onChange, language, onViewStateChange, initialViewState, isDiff, originalContent }: CodeEditorProps) {
   const editorRef = useRef<any>(null);
+  const monaco = useMonaco();
+
+  useEffect(() => {
+    if (monaco) {
+      monaco.editor.defineTheme('greenhouse-dark', {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [
+          { token: '', background: '111513' }
+        ],
+        colors: {
+          'editor.background': '#111513',
+          'editor.foreground': '#E4E8E5',
+          'editor.lineHighlightBackground': '#161C1A',
+          'editorLineNumber.foreground': '#8B9992',
+          'editor.selectionBackground': '#1A211E',
+          'editorCursor.foreground': '#7C9E8B',
+          'editorIndentGuide.background': '#161C1A',
+          'editorIndentGuide.activeBackground': '#8B9992',
+        }
+      });
+    }
+  }, [monaco]);
 
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor;
@@ -61,8 +84,9 @@ export function CodeEditor({ filePath, content, onChange, language, onViewStateC
           automaticLayout: true,
           readOnly: true,
           renderSideBySide: true,
+          fontFamily: "'JetBrains Mono', monospace",
         }}
-        theme="vs-dark"
+        theme="greenhouse-dark"
       />
     );
   }
@@ -80,8 +104,9 @@ export function CodeEditor({ filePath, content, onChange, language, onViewStateC
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
         automaticLayout: true,
+        fontFamily: "'JetBrains Mono', monospace",
       }}
-      theme="vs-dark"
+      theme="greenhouse-dark"
     />
   );
 }

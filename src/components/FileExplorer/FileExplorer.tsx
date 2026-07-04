@@ -20,15 +20,6 @@ export function FileExplorer({ workspaceRoot, onFileSelect }: FileExplorerProps)
   const [columns, setColumns] = useState<Column[]>([]);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, targetPath: string, targetNode?: FileNode } | null>(null);
 
-  // Soothing Dark Theme Colors
-  const colors = {
-    bgPanel: '#252526',
-    border: '#333333',
-    textPrimary: '#cccccc',
-    textSecondary: '#888888',
-    highlight: '#37373d',
-    accent: '#3794ff',
-  };
 
   useEffect(() => {
     if (workspaceRoot) {
@@ -158,11 +149,11 @@ export function FileExplorer({ workspaceRoot, onFileSelect }: FileExplorerProps)
   };
 
   return (
-    <div style={{ display: 'flex', overflowX: 'auto', height: '100%', backgroundColor: colors.bgPanel }}>
+    <div style={{ display: 'flex', overflowX: 'auto', height: '100%', backgroundColor: 'transparent' }}>
       {columns.map((col, colIndex) => (
         <div 
           key={col.dirPath} 
-          style={{ minWidth: 200, maxWidth: 250, flex: 1, borderRight: `1px solid ${colors.border}`, overflowY: 'auto' }}
+          style={{ minWidth: 200, maxWidth: 250, flex: 1, borderRight: '1px solid var(--color-border)', overflowY: 'auto' }}
           onContextMenu={(e) => handleContextMenu(e, col.dirPath)}
         >
           {col.nodes.map(node => {
@@ -179,19 +170,19 @@ export function FileExplorer({ workspaceRoot, onFileSelect }: FileExplorerProps)
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  backgroundColor: isSelected ? colors.highlight : 'transparent',
-                  color: isSelected ? '#fff' : colors.textPrimary,
+                  backgroundColor: isSelected ? 'var(--color-accent-subtle)' : 'transparent',
+                  color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
                 }}
-                onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = '#2a2d2e'; }}
+                onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--color-accent-subtle)'; }}
                 onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', gap: '8px' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', opacity: node.is_dir ? 0.8 : 1, color: node.is_dir ? colors.accent : colors.textSecondary }}>
-                    {node.is_dir ? <Folder size={16} fill={node.is_dir ? colors.accent : 'none'} fillOpacity={0.2} /> : <FileIcon name={node.name} size={16} />}
+                  <span style={{ display: 'flex', alignItems: 'center', opacity: node.is_dir ? 0.8 : 1, color: node.is_dir ? 'var(--color-accent)' : 'inherit' }}>
+                    {node.is_dir ? <Folder size={16} fill={node.is_dir ? 'var(--color-accent)' : 'none'} fillOpacity={0.2} /> : <FileIcon name={node.name} size={16} />}
                   </span>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{node.name}</span>
                 </div>
-                {node.is_dir && <span style={{ color: colors.textSecondary, marginLeft: 8, display: 'flex', alignItems: 'center' }}><ChevronRight size={16} /></span>}
+                {node.is_dir && <span style={{ color: 'var(--color-text-secondary)', marginLeft: 8, display: 'flex', alignItems: 'center' }}><ChevronRight size={16} /></span>}
               </div>
             );
           })}
@@ -203,22 +194,22 @@ export function FileExplorer({ workspaceRoot, onFileSelect }: FileExplorerProps)
           position: 'fixed',
           top: contextMenu.y,
           left: contextMenu.x,
-          backgroundColor: '#333333',
-          border: `1px solid ${colors.border}`,
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
           borderRadius: '4px',
           padding: '4px 0',
           zIndex: 1000,
           minWidth: '150px',
           boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-          color: colors.textPrimary,
+          color: 'var(--color-text-primary)',
           fontSize: '0.9em',
         }}>
-          <div style={{ padding: '6px 12px', cursor: 'pointer' }} onClick={handleCreateFile} onMouseEnter={e => e.currentTarget.style.backgroundColor = colors.accent} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>New File</div>
-          <div style={{ padding: '6px 12px', cursor: 'pointer' }} onClick={handleCreateDir} onMouseEnter={e => e.currentTarget.style.backgroundColor = colors.accent} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>New Folder</div>
+          <div style={{ padding: '6px 12px', cursor: 'pointer' }} onClick={handleCreateFile} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-accent-subtle)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>New File</div>
+          <div style={{ padding: '6px 12px', cursor: 'pointer' }} onClick={handleCreateDir} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-accent-subtle)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>New Folder</div>
           {contextMenu.targetNode && (
             <>
-              <div style={{ height: '1px', backgroundColor: colors.border, margin: '4px 0' }} />
-              <div style={{ padding: '6px 12px', cursor: 'pointer' }} onClick={handleRename} onMouseEnter={e => e.currentTarget.style.backgroundColor = colors.accent} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>Rename</div>
+              <div style={{ height: '1px', backgroundColor: 'var(--color-border)', margin: '4px 0' }} />
+              <div style={{ padding: '6px 12px', cursor: 'pointer' }} onClick={handleRename} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-accent-subtle)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>Rename</div>
               <div style={{ padding: '6px 12px', cursor: 'pointer', color: '#ff6b6b' }} onClick={handleDelete} onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#ff6b6b'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#ff6b6b'; }}>Delete</div>
             </>
           )}

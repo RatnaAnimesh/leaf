@@ -306,7 +306,7 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
       const changeKey = `${path}-${newContent.length}`; // Simple unique key
 
       if (approvedFiles.has(changeKey)) {
-        parts.push(<div key={`approved-${lastIndex}`} style={{ color: '#4caf50', margin: '4px 0' }}>✓ Approved changes to {path}</div>);
+        parts.push(<div key={`approved-${lastIndex}`} style={{ color: 'var(--color-accent)', margin: '4px 0' }}>✓ Approved changes to {path}</div>);
       } else if (rejectedFiles.has(changeKey)) {
         parts.push(<div key={`rejected-${lastIndex}`} style={{ color: '#f44336', margin: '4px 0' }}>✗ Rejected changes to {path}</div>);
       } else {
@@ -341,10 +341,10 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
             padding: '8px', 
             margin: '4px 0', 
             borderLeft: '4px solid #333333', 
-            color: '#888888', 
-            backgroundColor: '#1e1e1e',
+            color: 'var(--color-text-secondary)', 
+            backgroundColor: 'var(--color-base)',
             borderRadius: '0 4px 4px 0',
-            fontFamily: 'monospace',
+            fontFamily: "'JetBrains Mono', monospace",
             whiteSpace: 'pre-wrap',
             wordWrap: 'break-word',
             fontSize: '0.85em',
@@ -358,7 +358,7 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '8px', boxSizing: 'border-box', backgroundColor: '#252526', color: '#cccccc' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '8px', boxSizing: 'border-box', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}>
       <div style={{ flex: 1, overflow: 'auto', marginBottom: '8px', paddingRight: '4px' }}>
         {messages.map((m, i) => {
           const isUser = m.role === 'user';
@@ -370,7 +370,7 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
               alignItems: isUser ? 'flex-end' : 'flex-start' 
             }}>
               <div style={{
-                backgroundColor: isUser ? '#2a2d2e' : '#1e1e1e',
+                backgroundColor: isUser ? 'var(--color-accent-subtle)' : 'var(--color-base)',
                 border: '1px solid #333333',
                 padding: '10px 14px',
                 borderRadius: isUser ? '16px 16px 0 16px' : '16px 16px 16px 0',
@@ -393,7 +393,7 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
             alignItems: 'flex-start' 
           }}>
             <div style={{
-              backgroundColor: '#1e1e1e',
+              backgroundColor: 'var(--color-base)',
               border: '1px solid #333333',
               padding: '10px 14px',
               borderRadius: '16px 16px 16px 0',
@@ -404,7 +404,7 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
               lineHeight: '1.4'
             }}>
               {renderMessageContent(streamingMessage)}
-              <span style={{ display: 'inline-block', width: '8px', height: '14px', backgroundColor: '#cccccc', marginLeft: '4px', animation: 'blink 1s step-end infinite' }} />
+              <span style={{ display: 'inline-block', width: '8px', height: '14px', backgroundColor: 'var(--color-text-primary)', marginLeft: '4px', animation: 'blink 1s step-end infinite' }} />
             </div>
           </div>
         )}
@@ -418,7 +418,7 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
             right: 0,
             maxHeight: '200px',
             overflowY: 'auto',
-            background: '#1e1e1e',
+            background: 'var(--color-base)',
             border: '1px solid #333333',
             borderBottom: 'none',
             borderRadius: '4px 4px 0 0',
@@ -429,11 +429,11 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
                 key={idx}
                 onClick={() => insertMention(m)}
                 style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid #333333', display: 'flex', justifyContent: 'space-between' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#2a2d2e'}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--color-accent-subtle)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <span>{m.label}</span>
-                <span style={{ fontSize: '0.8em', color: '#888888' }}>{m.kind}</span>
+                <span style={{ fontSize: '0.8em', color: 'var(--color-text-secondary)' }}>{m.kind}</span>
               </div>
             ))}
           </div>
@@ -443,7 +443,7 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              backgroundColor: '#1e1e1e', 
+              backgroundColor: 'var(--color-base)', 
               border: '1px solid #333333', 
               borderRadius: '20px',
               padding: '4px',
@@ -461,13 +461,13 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
                 bottom: '4px',
                 width: 'calc(50% - 4px)',
                 left: useReasoning ? 'calc(50%)' : '4px',
-                backgroundColor: '#37373d',
+                backgroundColor: 'var(--color-accent-subtle)',
                 borderRadius: '16px',
                 transition: 'left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                 boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
               }}
             />
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px', zIndex: 1, color: !useReasoning ? '#fff' : '#888', transition: 'color 0.3s' }}>
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px', zIndex: 1, color: !useReasoning ? '#fff' : 'var(--color-text-secondary)', transition: 'color 0.3s' }}>
               {!useReasoning && isLoadingModel ? (
                 <Loader2 className="animate-spin" size={14} style={{ marginRight: '6px', animation: 'spin 1s linear infinite' }} />
               ) : (
@@ -477,7 +477,7 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
                 {(!useReasoning && isLoadingModel) ? 'Loading...' : 'Coder'}
               </span>
             </div>
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px', zIndex: 1, color: useReasoning ? '#fff' : '#888', transition: 'color 0.3s' }}>
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px', zIndex: 1, color: useReasoning ? '#fff' : 'var(--color-text-secondary)', transition: 'color 0.3s' }}>
               {useReasoning && isLoadingModel ? (
                 <Loader2 className="animate-spin" size={14} style={{ marginRight: '6px', animation: 'spin 1s linear infinite' }} />
               ) : (
@@ -494,8 +494,8 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
             {addedContext.map((c, i) => (
               <div key={i} style={{ 
-                backgroundColor: '#333333', 
-                color: '#cccccc', 
+                backgroundColor: 'var(--color-border)', 
+                color: 'var(--color-text-primary)', 
                 padding: '4px 10px', 
                 borderRadius: '12px', 
                 fontSize: '0.8rem',
@@ -505,7 +505,7 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
               }}>
                 <FileText size={12} /> {c.label}
                 <span 
-                  style={{ cursor: 'pointer', color: '#888888', marginLeft: '4px', display: 'flex', alignItems: 'center' }} 
+                  style={{ cursor: 'pointer', color: 'var(--color-text-secondary)', marginLeft: '4px', display: 'flex', alignItems: 'center' }} 
                   onClick={() => setAddedContext(prev => prev.filter(item => item.label !== c.label))}
                 >
                   <X size={12} />
@@ -539,8 +539,8 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                backgroundColor: '#1e1e1e',
-                color: '#cccccc',
+                backgroundColor: 'var(--color-base)',
+                color: 'var(--color-text-primary)',
                 border: '1px solid #007acc',
                 borderRadius: '8px',
                 boxSizing: 'border-box',
@@ -559,8 +559,8 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
             disabled={isStreaming}
             title="Add Context"
             style={{
-              backgroundColor: showContextSearch ? '#333333' : '#1e1e1e',
-              color: '#cccccc',
+              backgroundColor: showContextSearch ? 'var(--color-border)' : 'var(--color-base)',
+              color: 'var(--color-text-primary)',
               border: '1px solid #333333',
               width: '36px',
               height: '36px',
@@ -584,12 +584,12 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
               height: '36px',
               minHeight: '36px',
               maxHeight: '150px',
-              backgroundColor: '#1e1e1e', 
-              color: '#cccccc', 
+              backgroundColor: 'var(--color-base)', 
+              color: 'var(--color-text-primary)', 
               border: '1px solid #333333',
               borderRadius: '18px',
               outline: 'none',
-              fontFamily: 'inherit',
+              fontFamily: "'Outfit', sans-serif",
               lineHeight: '1.5',
               boxSizing: 'border-box'
             }}
@@ -648,14 +648,14 @@ export function ChatPanel(props: { workspaceRoot: string, activeFilePath?: strin
         </div>
         
         {/* Model Status Pill */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '4px', color: '#888888' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '4px', color: 'var(--color-text-secondary)' }}>
           <div>
             {modelStatus && (
               <span style={{ 
                 padding: '2px 6px', 
                 borderRadius: '12px', 
                 backgroundColor: modelStatus.state === 'ready' ? '#1e3320' : '#332b1e',
-                color: modelStatus.state === 'ready' ? '#4caf50' : '#ff9800',
+                color: modelStatus.state === 'ready' ? 'var(--color-accent)' : '#ff9800',
                 border: '1px solid currentColor'
               }}>
                 {modelStatus.role} | {modelStatus.state}

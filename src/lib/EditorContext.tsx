@@ -17,7 +17,7 @@ export interface EditorState {
 
 interface EditorContextType {
   state: EditorState;
-  openFile: (path: string, content: string, isDiff?: boolean, originalContent?: string) => void;
+  openFile: (path: string, content: string, isDiff?: boolean, originalContent?: string, line?: number) => void;
   closeFile: (path: string) => void;
   setActiveTab: (path: string) => void;
   updateTabContent: (path: string, content: string) => void;
@@ -33,10 +33,19 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     activeTabPath: null,
   });
 
-  const openFile = (path: string, content: string, isDiff?: boolean, originalContent?: string) => {
+  const openFile = (path: string, content: string, isDiff?: boolean, originalContent?: string, line?: number) => {
     setState((prev) => {
       const existing = prev.openTabs.find((t) => t.path === path && t.isDiff === isDiff);
       if (existing) {
+        if (line !== undefined) {
+          // If the tab is already open, just update its cursor position
+          const updatedTabs = prev.openTabs.map(t => 
+            t.path === path && t.isDiff === isDiff 
+              ? { ...t, cursorPosition: { lineNumber: line, column: 1 } }
+              : t
+          );
+          return { ...prev, openTabs: updatedTabs, activeTabPath: path };
+        }
         return { ...prev, activeTabPath: path };
       }
       // If we are opening a diff view for a file that is already open (or vice versa),
@@ -51,7 +60,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
             path,
             content,
             savedContent: content,
-            cursorPosition: { lineNumber: 1, column: 1 },
+            cursorPosition: { lineNumber: line !== undefined ? line : 1, column: 1 },
             scrollTop: 0,
             isDiff,
             originalContent,
